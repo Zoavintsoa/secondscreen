@@ -18,14 +18,18 @@
     <Configuration>Release</Configuration>
     <Platform Condition="'$(Platform)' == ''">x64</Platform>
     <RootNamespace>SecondScreenIddCx</RootNamespace>
-    <WindowsTargetPlatformVersion>$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup>
+    <WindowsTargetPlatformVersion Condition="'$(WindowsTargetPlatformVersion)' == ''">$(LatestTargetPlatformVersion)</WindowsTargetPlatformVersion>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>WindowsUserModeDriver10.0</PlatformToolset>
     <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <DriverType>UMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <UMDF_VERSION_MAJOR>2</UMDF_VERSION_MAJOR>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
@@ -33,7 +37,14 @@
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>WindowsUserModeDriver10.0</PlatformToolset>
     <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <DriverType>UMDF</DriverType>
+    <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <UMDF_VERSION_MAJOR>2</UMDF_VERSION_MAJOR>
+  </PropertyGroup>
+  <PropertyGroup>
+    <!-- Tell the WDK this is an Indirect Display Driver so its IddCx
+         props/targets add the correct IddCx headers and stub library. -->
+    <IndirectDisplayDriver>true</IndirectDisplayDriver>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
