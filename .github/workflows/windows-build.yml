@@ -1,0 +1,136 @@
+name: Windows Build
+
+# Objectif unique : compiler réellement le driver IddCx, SecondScreenHost et
+# DriverInstaller, puis produire SecondScreen-Setup.exe comme artefact
+# téléchargeable. Aucune fonctionnalité n'est ajoutée dans ce workflow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------
+      # ÉTAPE À RISQUE : le runner windows-latest a Visual Studio 2022 et le
+      # Windows SDK, mais PAS le Windows Driver Kit (WDK) par défaut.
+      # On utilise ici la configuration winget officielle publiée par
+      # Microsoft dans le dépôt Windows-driver-samples (celui-là même dont
+      # notre driver IddCx est dérivé) pour installer VS + WDK + SDK de
+      # façon non interactive. C'est le point le plus susceptible d'échouer
+      # au premier run : si winget configure échoue ici, regarder le log de
+      # cette étape en premier avant toute autre chose (Étape 5 du plan).
+      # ------------------------------------------------------------------
+      - name: Install Windows Driver Kit (WDK) via winget configure
+        shell: pwsh
+        run: |
+          winget configure -f `
+            "https://raw.githubusercontent.com/microsoft/Windows-driver-samples/main/_wdk_utils/winget/configs/wdk-vscommunity.dsc.yaml" `
+            --accept-configuration-agreements `
+            --accept-package-agreements `
+            --disable-interactivity
+
+      - name: Verify WDK installation
+        shell: pwsh
+        run: |
+          $wdkInclude = "${env:ProgramFiles(x86)}\Windows Kits\10\Include"
+          if (-not (Test-Path $wdkInclude)) {
+            throw "WDK headers not found at $wdkInclude after winget configure. See the previous step's log."
+          }
+          Write-Host "WDK headers found at $wdkInclude"
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      # ------------------------------------------------------------------
+      # 1) Driver IddCx (UMDF) — construit via le script existant, qui
+      #    génère aussi le catalogue signé de test (.cat) via Inf2Cat.
+      # ------------------------------------------------------------------
+      - name: Build IddCx driver
+        shell: pwsh
+        run: .\scripts\build-windows-driver.ps1 -Configuration Release -Platform x64
+
+      - name: Verify driver package
+        shell: pwsh
+        run: |
+          $pkg = "artifacts\windows-driver"
+          foreach ($f in @("SecondScreenIddCx.dll", "SecondScreenIddCx.inf", "SecondScreenIddCx.cat")) {
+            if (-not (Test-Path (Join-Path $pkg $f))) {
+              throw "Missing expected driver artifact: $f"
+            }
+          }
+          Write-Host "Driver package complete: $pkg"
+
+      # ------------------------------------------------------------------
+      # 2) SecondScreenHost.exe et SecondScreenDriverInstaller.exe — via
+      #    CMake, comme défini dans CMakeLists.txt à la racine du dépôt.
+      # ------------------------------------------------------------------
+      - name: Configure CMake
+        shell: pwsh
+        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+      - name: Build Host + DriverInstaller (CMake)
+        shell: pwsh
+        run: cmake --build build --config Release --target SecondScreenHost SecondScreenDriverInstaller
+
+      - name: Build and run cross-platform unit tests
+        shell: pwsh
+        run: |
+          cmake --build build --config Release --target test_protocol test_framing test_pipeline
+          ctest --test-dir build -C Release --output-on-failure
+
+      # ------------------------------------------------------------------
+      # 3) Rassembler les binaires dans la structure attendue par
+      #    installer\SecondScreen.iss (BuildOutput\app, BuildOutput\driver).
+      # ------------------------------------------------------------------
+      - name: Stage build output for the installer
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path stage\app | Out-Null
+          New-Item -ItemType Directory -Force -Path stage\driver | Out-Null
+          Copy-Item build\Release\SecondScreenHost.exe stage\app\
+          Copy-Item build\Release\SecondScreenDriverInstaller.exe stage\app\
+          Copy-Item artifacts\windows-driver\SecondScreenIddCx.inf stage\driver\
+          Copy-Item artifacts\windows-driver\SecondScreenIddCx.cat stage\driver\
+          Copy-Item artifacts\windows-driver\SecondScreenIddCx.dll stage\driver\
+
+      # ------------------------------------------------------------------
+      # 4) Compiler SecondScreen-Setup.exe avec Inno Setup.
+      #    Le driver reste signé "test" (bcdedit testsigning) à ce stade :
+      #    ce n'est PAS encore une release commerciale finale.
+      # ------------------------------------------------------------------
+      - name: Install Inno Setup
+        shell: pwsh
+        run: winget install --id JRSoftware.InnoSetup -e --silent --accept-package-agreements --accept-source-agreements
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc "/DBuildOutput=$PWD\stage" installer\SecondScreen.iss
+
+      - name: Upload SecondScreen-Setup.exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecondScreen-Setup
+          path: stage\installer\SecondScreen-Setup.exe
+          if-no-files-found: error
+
+      - name: Upload driver package (for direct install/debug)
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-driver-package
+          path: artifacts\windows-driver\
+          if-no-files-found: error

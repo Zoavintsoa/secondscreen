@@ -20,18 +20,20 @@ if exist "%VS_DEV_CMD%" (
     echo [WARNING] Visual Studio 2022 Developer Command Prompt not found automatically.
 )
 
-echo [*] Building SecondScreenWindows.sln (Driver + DriverInstaller, Release x64)...
-msbuild "%~dp0..\SecondScreenWindows.sln" /p:Configuration=Release /p:Platform=x64 /t:Rebuild /m
+echo [*] Building SecondScreenIddCx.vcxproj (Release x64)...
+msbuild "%~dp0..\driver\SecondScreenIddCx.vcxproj" /p:Configuration=Release /p:Platform=x64 /t:Rebuild
 
 if %ERRORLEVEL% equ 0 (
     echo.
-    echo [SUCCESS] Driver and DriverInstaller built successfully!
-    echo Driver output:    %~dp0..\driver\x64\Release\
-    echo Installer output: %~dp0..\x64\Release\SecondScreenDriverInstaller.exe
+    echo [SUCCESS] Driver binary built successfully!
+    echo Output directory: %~dp0..\driver\x64\Release\
     echo.
-    echo Next steps:
-    echo   - Dev/test install:  run install_driver.ps1 as Administrator ^(test-signing, self-signed cert^).
-    echo   - Signed install:    run SecondScreenDriverInstaller.exe install ^<path-to-signed.inf^> as Administrator.
+    echo NOTE: SecondScreenHost.exe and SecondScreenDriverInstaller.exe are now
+    echo built separately via CMake from the repository root:
+    echo   cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+    echo   cmake --build build --config Release
+    echo.
+    echo Next step: Run install_driver.ps1 as Administrator to install Display 2.
 ) else (
     echo.
     echo [ERROR] Build failed with exit code %ERRORLEVEL%.
