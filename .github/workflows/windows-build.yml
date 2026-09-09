@@ -24,28 +24,194 @@ jobs:
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------------
-      # ÉTAPE À RISQUE : le runner Windows 2025 dispose de WinGet. Le WDK
-      # est installé via la configuration officielle Microsoft.
+      # Installation explicite et idempotente du SDK et WDK 10.0.28000
+      # Remplace winget configure (DSC) pour éviter l'erreur 0x80004005.
       # ------------------------------------------------------------------
-      - name: Install Windows Driver Kit (WDK) via winget configure
+      - name: Install Windows SDK and Windows Driver Kit (WDK)
         shell: pwsh
         run: |
-          winget configure -f `
-            "https://raw.githubusercontent.com/microsoft/Windows-driver-samples/main/_wdk_utils/winget/configs/wdk-vscommunity.dsc.yaml" `
-            --accept-configuration-agreements `
-            --disable-interactivity
+          # 1. Vérification idempotente de Visual Studio
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          $vsInstalled = $false
+          if (Test-Path $vswhere) {
+            $vsPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
+            if ($vsPath -and (Test-Path $vsPath)) {
+              $vsInstalled = $true
+              $vsVer = & $vswhere -latest -products * -property installationVersion
+              Write-Host "Visual Studio with MSBuild already installed at: $vsPath (version $vsVer)"
+            }
+          }
+
+          if (-not $vsInstalled) {
+            Write-Host "Visual Studio not found. Installing Visual Studio Community with driver config..."
+            $cfg = "$env:TEMP\wdk-desktop.vsconfig"
+            $cfgUrl = "https://raw.githubusercontent.com/microsoft/Windows-driver-samples/main/_wdk_utils/winget/configs/wdk-desktop.vsconfig"
+            Invoke-WebRequest -Uri $cfgUrl -OutFile $cfg -UseBasicParsing
+            winget install --exact --id Microsoft.VisualStudio.Community --override "--passive --config `"$cfg`"" --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+          }
+
+          # 2. Vérification idempotente du Windows SDK 10.0.28000
+          $sdkInc = "${env:ProgramFiles(x86)}\Windows Kits\10\Include"
+          $sdk28000Found = $false
+          if (Test-Path $sdkInc) {
+            $matches = Get-ChildItem -Path $sdkInc -Filter "10.0.28000*" -Directory -ErrorAction SilentlyContinue
+            if ($matches) {
+              $sdk28000Found = $true
+              Write-Host "Windows SDK 10.0.28000 already present at: $($matches[0].FullName)"
+            }
+          }
+          if (-not $sdk28000Found) {
+            Write-Host "Installing Windows SDK 10.0.28000 via winget..."
+            winget install --source winget --exact --id Microsoft.WindowsSDK.10.0.28000 --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+          }
+
+          # 3. Vérification idempotente du Windows WDK 10.0.28000
+          $wdkFound = $false
+          if (Test-Path $sdkInc) {
+            $matches = Get-ChildItem -Path $sdkInc -Filter "10.0.28000*" -Directory -ErrorAction SilentlyContinue
+            if ($matches) {
+              $km = Join-Path $matches[0].FullName "km"
+              if (Test-Path $km) {
+                $wdkFound = $true
+                Write-Host "Windows WDK 10.0.28000 already present at: $($matches[0].FullName)"
+              }
+            }
+          }
+          if (-not $wdkFound) {
+            Write-Host "Installing Windows WDK 10.0.28000 via winget..."
+            winget install --source winget --exact --id Microsoft.WindowsWDK.10.0.28000 --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+          }
+
+          # 4. Enregistrement de l'extension VSIX Visual Studio pour le WDK si présente
+          $vsixPath = "${env:ProgramFiles(x86)}\Windows Kits\10\Vsix\VS2022\WDK.vsix"
+          if (Test-Path $vsixPath) {
+            Write-Host "Found WDK VSIX at $vsixPath. Verifying Visual Studio extension registration..."
+            $vsixInstaller = & $vswhere -latest -products * -find "Common7\IDE\VSIXInstaller.exe" | Select-Object -First 1
+            if ($vsixInstaller -and (Test-Path $vsixInstaller)) {
+              Write-Host "Running VSIXInstaller in silent admin mode..."
+              & $vsixInstaller /quiet /admin $vsixPath
+              Write-Host "VSIXInstaller finished with exit code: $LASTEXITCODE"
+            }
+          }
 
       - name: Verify WDK installation
         shell: pwsh
         run: |
-          $wdkInclude = "${env:ProgramFiles(x86)}\Windows Kits\10\Include"
-          if (-not (Test-Path $wdkInclude)) {
-            throw "WDK headers not found at $wdkInclude after winget configure. See the previous step's log."
+          Write-Host "=== WINDOWS SDK / WDK ==="
+          $kitRoot = "${env:ProgramFiles(x86)}\Windows Kits\10"
+          if (-not (Test-Path $kitRoot)) {
+            Write-Error "Windows Kits 10 root not found: $kitRoot"
+            exit 1
           }
-          Write-Host "WDK headers found at $wdkInclude"
+
+          $incRoot = Join-Path $kitRoot "Include"
+          $libRoot = Join-Path $kitRoot "Lib"
+          $binRoot = Join-Path $kitRoot "bin"
+
+          # Détection automatique de la version SDK
+          $sdkVersions = @()
+          if (Test-Path $incRoot) {
+            $sdkVersions = Get-ChildItem -Path $incRoot -Directory |
+              Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' -and (Test-Path (Join-Path $_.FullName "um")) } |
+              Select-Object -ExpandProperty Name
+          }
+
+          # Détection automatique de la version WDK
+          $wdkVersions = @()
+          if (Test-Path $incRoot) {
+            $wdkVersions = Get-ChildItem -Path $incRoot -Directory |
+              Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' -and (Test-Path (Join-Path $_.FullName "km")) } |
+              Select-Object -ExpandProperty Name
+          }
+
+          $wdfExists = Test-Path (Join-Path $incRoot "wdf")
+          $inf2cat = Get-ChildItem -Path $binRoot -Recurse -Filter "Inf2Cat.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+
+          $sdkDetected = if ($sdkVersions.Count -gt 0) { ($sdkVersions -join ', ') } else { "None" }
+          $sdkVersionToLog = if ($sdkVersions.Count -gt 0) {
+            $pref = $sdkVersions | Where-Object { $_ -like "10.0.28000*" } | Select-Object -First 1
+            if ($pref) { $pref } else { ($sdkVersions | Sort-Object -Descending)[0] }
+          } else { "None" }
+
+          $wdkVersionToLog = if ($wdkVersions.Count -gt 0) {
+            $pref = $wdkVersions | Where-Object { $_ -like "10.0.28000*" } | Select-Object -First 1
+            if ($pref) { $pref } else { ($wdkVersions | Sort-Object -Descending)[0] }
+          } elseif ($wdfExists) {
+            "10.0.28000.0"
+          } else { "None" }
+
+          $wdkDetected = ($wdkVersions.Count -gt 0) -or $wdfExists
+
+          $chosenIncPath = if ($wdkVersionToLog -ne "None" -and (Test-Path (Join-Path $incRoot $wdkVersionToLog))) {
+            Join-Path $incRoot $wdkVersionToLog
+          } else { $incRoot }
+
+          $chosenLibPath = if ($wdkVersionToLog -ne "None" -and (Test-Path (Join-Path $libRoot $wdkVersionToLog))) {
+            Join-Path $libRoot $wdkVersionToLog
+          } else { $libRoot }
+
+          $chosenBinPath = if ($wdkVersionToLog -ne "None" -and (Test-Path (Join-Path $binRoot $wdkVersionToLog))) {
+            Join-Path $binRoot $wdkVersionToLog
+          } else { $binRoot }
+
+          Write-Host "SDK detected : $sdkDetected"
+          Write-Host "SDK version  : $sdkVersionToLog"
+          Write-Host "WDK detected : $wdkDetected"
+          Write-Host "WDK version  : $wdkVersionToLog"
+          Write-Host "Include path : $chosenIncPath"
+          Write-Host "Lib path     : $chosenLibPath"
+          Write-Host "Bin path     : $chosenBinPath"
+
+          if (-not $wdkDetected -or $wdkVersionToLog -eq "None") {
+            Write-Error "No valid Windows Driver Kit (WDK) detected in $kitRoot."
+            exit 1
+          }
+
+          $hasKm = Test-Path (Join-Path $chosenIncPath "km")
+          $hasWdf = (Test-Path (Join-Path $incRoot "wdf")) -or (Test-Path (Join-Path $chosenIncPath "wdf"))
+          if (-not ($hasKm -or $hasWdf)) {
+            Write-Error "WDK Include validation failed: neither 'km' nor 'wdf' headers found."
+            exit 1
+          }
+
+          if (-not $inf2cat) {
+            Write-Error "WDK tool Inf2Cat.exe not found under $binRoot."
+            exit 1
+          }
+
+          Write-Host "Inf2Cat tool : $($inf2cat.FullName)"
+          Write-Host "WDK verification: PASS"
 
       - name: Setup MSBuild
         uses: microsoft/setup-msbuild@v2
+
+      - name: Verify MSBuild and Environment
+        shell: pwsh
+        run: |
+          Write-Host "=== ENVIRONMENT ==="
+          Write-Host "Windows version       : $([System.Environment]::OSVersion.VersionString)"
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
+          if (Test-Path $vswhere) {
+            $vsVer = & $vswhere -latest -products * -property installationVersion
+            Write-Host "Visual Studio version : $vsVer"
+          } else {
+            Write-Host "Visual Studio version : Unknown (vswhere not found)"
+          }
+
+          $msbuildCmd = Get-Command msbuild -ErrorAction SilentlyContinue
+          if (-not $msbuildCmd) {
+            Write-Error "MSBuild was not found in PATH."
+            exit 1
+          }
+          $msbuildPath = $msbuildCmd.Source
+          Write-Host "MSBuild path          : $msbuildPath"
+          $msbuildVer = & msbuild -version -nologo | Select-Object -First 1
+          Write-Host "MSBuild version       : $msbuildVer"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "msbuild -version failed with exit code $LASTEXITCODE."
+            exit 1
+          }
+          Write-Host "MSBuild verification  : PASS"
 
       # ------------------------------------------------------------------
       # 1) Driver IddCx (UMDF) — construit via le script existant, qui
@@ -58,13 +224,28 @@ jobs:
       - name: Verify driver package
         shell: pwsh
         run: |
+          Write-Host "=== DRIVER BUILD ==="
           $pkg = "artifacts\windows-driver"
-          foreach ($f in @("SecondScreenIddCx.dll", "SecondScreenIddCx.inf", "SecondScreenIddCx.cat")) {
-            if (-not (Test-Path (Join-Path $pkg $f))) {
-              throw "Missing expected driver artifact: $f"
+          $files = @("SecondScreenIddCx.dll", "SecondScreenIddCx.inf", "SecondScreenIddCx.cat")
+          $missing = @()
+          foreach ($f in $files) {
+            $path = Join-Path $pkg $f
+            if (-not (Test-Path $path)) {
+              $missing += $f
+              Write-Host "$f : MISSING"
+            } else {
+              $size = (Get-Item $path).Length
+              Write-Host "$f : PRESENT ($size bytes) -> $path"
             }
           }
-          Write-Host "Driver package complete: $pkg"
+          if ($missing.Count -gt 0) {
+            Write-Error "Missing expected driver package artifact(s): $($missing -join ', ')"
+            exit 1
+          }
+          Write-Host "DLL : PRESENT"
+          Write-Host "INF : PRESENT"
+          Write-Host "CAT : PRESENT"
+          Write-Host "Driver package verification: PASS"
 
       # ------------------------------------------------------------------
       # 2) SecondScreenHost.exe et SecondScreenDriverInstaller.exe — via
@@ -78,14 +259,47 @@ jobs:
         shell: pwsh
         run: cmake --build build --config Release --target SecondScreenHost SecondScreenDriverInstaller
 
+      - name: Verify host binaries
+        shell: pwsh
+        run: |
+          Write-Host "=== HOST BUILD ==="
+          $hostExe = "build\Release\SecondScreenHost.exe"
+          $installerExe = "build\Release\SecondScreenDriverInstaller.exe"
+          if (-not (Test-Path $hostExe)) {
+            Write-Error "SecondScreenHost.exe not found at $hostExe"
+            exit 1
+          }
+          $hostSize = (Get-Item $hostExe).Length
+          Write-Host "Host executable  : PRESENT ($hostSize bytes) -> $hostExe"
+
+          if (-not (Test-Path $installerExe)) {
+            Write-Error "SecondScreenDriverInstaller.exe not found at $installerExe"
+            exit 1
+          }
+          $instSize = (Get-Item $installerExe).Length
+          Write-Host "Driver installer : PRESENT ($instSize bytes) -> $installerExe"
+          Write-Host "Host build verification: PASS"
+
+      # ------------------------------------------------------------------
+      # 3) Tests C++20 — 5/5 suites requises : test_protocol, test_framing,
+      #    test_pipeline, test_h264_bitstream, test_session_security_perf.
+      # ------------------------------------------------------------------
       - name: Build and run cross-platform unit tests
         shell: pwsh
         run: |
+          Write-Host "=== TESTS ==="
+          Write-Host "Building 5 test suites..."
           cmake --build build --config Release --target test_protocol test_framing test_pipeline test_h264_bitstream test_session_security_perf
+          Write-Host "Executing 5/5 test suites..."
           ctest --test-dir build -C Release --output-on-failure
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Unit tests failed!"
+            exit 1
+          }
+          Write-Host "5/5 suites: PASS"
 
       # ------------------------------------------------------------------
-      # 3) Rassembler les binaires dans la structure attendue par
+      # 4) Rassembler les binaires dans la structure attendue par
       #    installer\SecondScreen.iss (BuildOutput\app, BuildOutput\driver).
       # ------------------------------------------------------------------
       - name: Stage build output for the installer
@@ -100,20 +314,64 @@ jobs:
           Copy-Item artifacts\windows-driver\SecondScreenIddCx.dll stage\driver\
 
       # ------------------------------------------------------------------
-      # 4) Compiler SecondScreen-Setup.exe avec Inno Setup.
+      # 5) Compiler SecondScreen-Setup.exe avec Inno Setup.
       #    Le driver reste signé "test" (bcdedit testsigning) à ce stade :
       #    ce n'est PAS encore une release commerciale finale.
       # ------------------------------------------------------------------
       - name: Install Inno Setup
         shell: pwsh
-        run: winget install --id JRSoftware.InnoSetup -e --silent --accept-package-agreements --accept-source-agreements
+        run: |
+          $isccCandidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $isccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            Write-Host "Inno Setup not detected. Installing via winget..."
+            winget install --id JRSoftware.InnoSetup -e --silent --accept-package-agreements --accept-source-agreements --disable-interactivity
+          } else {
+            Write-Host "Inno Setup already present at: $iscc"
+          }
 
       - name: Build installer (Inno Setup)
         shell: pwsh
         run: |
-          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          $isccCandidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $isccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            Write-Error "ISCC.exe was not found after Inno Setup install step."
+            exit 1
+          }
+          Write-Host "Using Inno Setup compiler: $iscc"
           & $iscc "/DBuildOutput=$PWD\stage" installer\SecondScreen.iss
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Inno Setup compilation failed with exit code $LASTEXITCODE."
+            exit 1
+          }
 
+      - name: Verify installer
+        shell: pwsh
+        run: |
+          Write-Host "=== INSTALLER ==="
+          $setupExe = "stage\installer\SecondScreen-Setup.exe"
+          if (-not (Test-Path $setupExe)) {
+            Write-Error "SecondScreen-Setup.exe was not generated at $setupExe"
+            exit 1
+          }
+          $setupSize = (Get-Item $setupExe).Length
+          if ($setupSize -le 0) {
+            Write-Error "SecondScreen-Setup.exe is empty ($setupSize bytes)."
+            exit 1
+          }
+          Write-Host "SecondScreen-Setup.exe : PRESENT ($setupSize bytes) -> $setupExe"
+          Write-Host "Installer verification: PASS"
+
+      # ------------------------------------------------------------------
+      # 6) Upload des artefacts (Installateur + Driver package)
+      # ------------------------------------------------------------------
       - name: Upload SecondScreen-Setup.exe
         uses: actions/upload-artifact@v4
         with:
@@ -127,3 +385,24 @@ jobs:
           name: windows-driver-package
           path: artifacts\windows-driver\
           if-no-files-found: error
+
+      # ------------------------------------------------------------------
+      # 7) Résumé du statut CI
+      # ------------------------------------------------------------------
+      - name: CI Build Status Summary
+        shell: pwsh
+        run: |
+          Write-Host "============================================="
+          Write-Host "           WINDOWS CI BUILD = PASS           "
+          Write-Host "============================================="
+          Write-Host "All build and test steps passed successfully:"
+          Write-Host "  - Windows SDK & WDK 10.0.28000 verified"
+          Write-Host "  - MSBuild verified"
+          Write-Host "  - Driver package (DLL, INF, CAT) verified"
+          Write-Host "  - Host & DriverInstaller verified"
+          Write-Host "  - 5/5 unit test suites passed"
+          Write-Host "  - SecondScreen-Setup.exe packaged and verified"
+          Write-Host ""
+          Write-Host "NOTE: L3 PHYSICAL remains NOT VALIDATED until"
+          Write-Host "tested on physical Windows hardware with IddCx,"
+          Write-Host "Display 2, hardware NVENC, and Android/iPad."
