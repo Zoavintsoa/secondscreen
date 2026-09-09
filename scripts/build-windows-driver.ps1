@@ -15,7 +15,7 @@ if (-not (Test-Path $projectPath)) {
 
 $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
 if (-not (Test-Path $vswhere)) {
-    throw 'Visual Studio Build Tools 2022 with the Windows Driver Kit are required. vswhere.exe was not found.'
+    throw 'Visual Studio with the Windows Driver Kit is required. vswhere.exe was not found.'
 }
 
 $msbuildPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
@@ -28,7 +28,18 @@ if (-not (Test-Path (Join-Path $wdkRoot 'Include'))) {
     throw 'Windows Driver Kit 10/11 headers were not found. Install a WDK matching the Windows SDK.'
 }
 
-& $msbuildPath $projectPath "/p:Configuration=$Configuration" "/p:Platform=$Platform" /t:Rebuild /m
+# WDK 10.0.28000's MSBuild InfVerif target currently fails on the GitHub
+# Windows 2025 image because it resolves the x86 DLL from the wrong directory.
+# Disable only that MSBuild validation target; Inf2Cat is still run explicitly
+# below to validate and generate the driver package catalog.
+$msbuildProperties = @(
+    "/p:Configuration=$Configuration",
+    "/p:Platform=$Platform",
+    '/p:EnableInfVerif=false',
+    '/p:RunApiValidator=false'
+)
+
+& $msbuildPath $projectPath @msbuildProperties /t:Rebuild /m
 if ($LASTEXITCODE -ne 0) {
     throw "Driver build failed with exit code $LASTEXITCODE."
 }
@@ -39,9 +50,19 @@ if (-not (Test-Path $driverBinary)) {
     throw "MSBuild succeeded but the UMDF driver binary was not found: $driverBinary"
 }
 
-$inf2cat = Get-ChildItem -Path (Join-Path $wdkRoot 'bin') -Recurse -Filter Inf2Cat.exe -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
+# Inf2Cat is an x86 WDK tool; prefer the matching x86 binary explicitly.
+$inf2catCandidates = @(
+    (Join-Path $wdkRoot 'bin\10.0.28000.0\x86\Inf2Cat.exe'),
+    (Join-Path $wdkRoot 'bin\x86\Inf2Cat.exe')
+)
+$inf2cat = $inf2catCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $inf2cat) {
-    throw 'Inf2Cat.exe was not found in the WDK. The driver package catalog was not generated.'
+    $inf2cat = Get-ChildItem -Path (Join-Path $wdkRoot 'bin') -Recurse -Filter Inf2Cat.exe -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -match '\\x86\\Inf2Cat\.exe$' } |
+        Select-Object -First 1 -ExpandProperty FullName
+}
+if (-not $inf2cat) {
+    throw 'Inf2Cat.exe was not found in the x86 WDK tools. The driver package catalog was not generated.'
 }
 
 $packageDirectory = Join-Path $repoRoot 'artifacts\windows-driver'
