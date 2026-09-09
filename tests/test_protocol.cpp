@@ -1,4 +1,4 @@
-// Unit Test: Wire Protocol Validation (PacketHeader 24 bytes, Struct Sizes & Layouts)
+// Unit Test: Wire Protocol Validation (PacketHeader 24B, VideoPacketHeader 32B, Struct Layouts & CRC-32)
 // Copyright (c) 2026 SecondScreen Project. All rights reserved.
 
 #include "../core/protocol/Protocol.h"
@@ -10,22 +10,33 @@
 using namespace SecondScreen;
 
 void TestStructSizes() {
-    std::cout << "[TEST] Validating Wire Protocol Struct Sizes..." << std::endl;
+    std::cout << "[TEST] Validating Wire Protocol Struct Sizes & Offsets..." << std::endl;
 
-    std::cout << "  sizeof(PacketHeader):  " << sizeof(PacketHeader) << " bytes (Expected: 24)" << std::endl;
+    std::cout << "  sizeof(PacketHeader):      " << sizeof(PacketHeader) << " bytes (Expected: 24)" << std::endl;
     assert(sizeof(PacketHeader) == 24);
 
-    std::cout << "  sizeof(InputEvent):    " << sizeof(InputEvent) << " bytes (Expected: 22)" << std::endl;
+    std::cout << "  sizeof(VideoPacketHeader): " << sizeof(VideoPacketHeader) << " bytes (Expected: 32)" << std::endl;
+    assert(sizeof(VideoPacketHeader) == 32);
+
+    std::cout << "  sizeof(InputEvent):        " << sizeof(InputEvent) << " bytes (Expected: 22)" << std::endl;
     assert(sizeof(InputEvent) == 22);
 
-    std::cout << "  sizeof(TelemetryData): " << sizeof(TelemetryData) << " bytes (Expected: 37)" << std::endl;
+    std::cout << "  sizeof(TelemetryData):     " << sizeof(TelemetryData) << " bytes (Expected: 37)" << std::endl;
     assert(sizeof(TelemetryData) == 37);
 
-    std::cout << "  sizeof(DisplayConfig): " << sizeof(DisplayConfig) << " bytes (Expected: 20)" << std::endl;
+    std::cout << "  sizeof(DisplayConfig):     " << sizeof(DisplayConfig) << " bytes (Expected: 20)" << std::endl;
     assert(sizeof(DisplayConfig) == 20);
 
-    std::cout << "[PASS] Struct sizes verified successfully.\n" << std::endl;
+    std::cout << "  sizeof(DisplayConfigAck):  " << sizeof(DisplayConfigAck) << " bytes (Expected: 8)" << std::endl;
+    assert(sizeof(DisplayConfigAck) == 8);
 
+    // Verify critical binary field offsets
+    assert(offsetof(PacketHeader, payloadSize) == 20);
+    assert(offsetof(VideoPacketHeader, crc32) == 28);
+    assert(offsetof(TelemetryData, isMeasured) == 36);
+    assert(offsetof(DisplayConfigAck, status) == 4);
+
+    std::cout << "[PASS] Struct sizes and compile-time offsets verified successfully.\n" << std::endl;
 }
 
 void TestHeaderSerialization() {
@@ -73,6 +84,141 @@ void TestHeaderSerialization() {
     std::cout << "[PASS] Binary offsets and little-endian layout verified.\n" << std::endl;
 }
 
+void TestVideoPacketHeaderSerialization() {
+    std::cout << "[TEST] Validating VideoPacketHeader 32-Byte Layout..." << std::endl;
+
+    VideoPacketHeader vHdr = {};
+    vHdr.magic = VIDEO_MAGIC;
+    vHdr.sessionId = 98765432;
+    vHdr.frameId = 12050;
+    vHdr.packetIndex = 2;
+    vHdr.packetCount = 5;
+    vHdr.flags = 0x02; // Last fragment flag
+    vHdr.codec = static_cast<uint8_t>(VideoCodec::H264);
+    vHdr.payloadSize = 1400;
+    vHdr.timestampUs = 1718290000999ULL;
+    vHdr.crc32 = 0xDEADBEEF;
+
+    std::vector<uint8_t> buffer(sizeof(VideoPacketHeader));
+    std::memcpy(buffer.data(), &vHdr, sizeof(VideoPacketHeader));
+
+    uint32_t magic;
+    std::memcpy(&magic, buffer.data() + 0, 4);
+    assert(magic == VIDEO_MAGIC);
+
+    uint32_t sess;
+    std::memcpy(&sess, buffer.data() + 4, 4);
+    assert(sess == 98765432);
+
+    uint32_t fId;
+    std::memcpy(&fId, buffer.data() + 8, 4);
+    assert(fId == 12050);
+
+    uint16_t pIdx;
+    std::memcpy(&pIdx, buffer.data() + 12, 2);
+    assert(pIdx == 2);
+
+    uint16_t pCnt;
+    std::memcpy(&pCnt, buffer.data() + 14, 2);
+    assert(pCnt == 5);
+
+    uint8_t flg = buffer[16];
+    assert(flg == 0x02);
+
+    uint8_t cdc = buffer[17];
+    assert(cdc == static_cast<uint8_t>(VideoCodec::H264));
+
+    uint16_t pLen;
+    std::memcpy(&pLen, buffer.data() + 18, 2);
+    assert(pLen == 1400);
+
+    uint64_t ts;
+    std::memcpy(&ts, buffer.data() + 20, 8);
+    assert(ts == 1718290000999ULL);
+
+    uint32_t crc;
+    std::memcpy(&crc, buffer.data() + 28, 4);
+    assert(crc == 0xDEADBEEF);
+
+    std::cout << "[PASS] VideoPacketHeader 32-byte layout verified.\n" << std::endl;
+}
+
+void TestDisplayConfigAckPacking() {
+    std::cout << "[TEST] Validating DisplayConfigAck 8-Byte Layout..." << std::endl;
+
+    DisplayConfigAck ack = {};
+    ack.displayId = 2;
+    ack.status = static_cast<uint8_t>(DisplayConfigStatus::ACCEPTED);
+
+    uint8_t buf[sizeof(DisplayConfigAck)];
+    std::memcpy(buf, &ack, sizeof(DisplayConfigAck));
+
+    DisplayConfigAck restored = {};
+    std::memcpy(&restored, buf, sizeof(DisplayConfigAck));
+
+    assert(restored.displayId == 2);
+    assert(restored.status == static_cast<uint8_t>(DisplayConfigStatus::ACCEPTED));
+
+    std::cout << "[PASS] DisplayConfigAck 8-byte serialization verified.\n" << std::endl;
+}
+
+void TestCRC32Comprehensive() {
+    std::cout << "[TEST] Validating CRC-32 IEEE 802.3 Standard & Video Packet Integrity..." << std::endl;
+
+    // 1. Mandatory standard test vector: "123456789" -> 0xCBF43926
+    const char* standardVector = "123456789";
+    uint32_t crcVector = CalculateCRC32(reinterpret_cast<const uint8_t*>(standardVector), 9);
+    std::cout << "  CRC-32 of '123456789': 0x" << std::hex << crcVector << std::dec << " (Expected: 0xCBF43926)" << std::endl;
+    assert(crcVector == 0xCBF43926);
+
+    // 2. Valid video packet CRC calculation (excluding crc32 field itself)
+    VideoPacketHeader vHdr = {};
+    vHdr.magic = VIDEO_MAGIC;
+    vHdr.sessionId = 12345;
+    vHdr.frameId = 100;
+    vHdr.packetIndex = 0;
+    vHdr.packetCount = 1;
+    vHdr.flags = 0x01;
+    vHdr.codec = static_cast<uint8_t>(VideoCodec::H264);
+    vHdr.payloadSize = 512;
+    vHdr.timestampUs = 1000000ULL;
+
+    std::vector<uint8_t> payload(512, 0x42);
+    vHdr.crc32 = CalculateVideoPacketCRC(vHdr, payload.data());
+
+    // Verify valid packet
+    assert(CalculateVideoPacketCRC(vHdr, payload.data()) == vHdr.crc32);
+
+    // 3. Corrupted header detection (e.g. frameId changed in transit)
+    VideoPacketHeader corruptedHeader = vHdr;
+    corruptedHeader.frameId = 101;
+    assert(CalculateVideoPacketCRC(corruptedHeader, payload.data()) != vHdr.crc32);
+
+    // 4. Corrupted payload detection
+    std::vector<uint8_t> corruptedPayload = payload;
+    corruptedPayload[250] ^= 0x01;
+    assert(CalculateVideoPacketCRC(vHdr, corruptedPayload.data()) != vHdr.crc32);
+
+    // 5. Corrupted CRC detection
+    uint32_t badCrc = vHdr.crc32 ^ 0xFFFFFFFF;
+    assert(CalculateVideoPacketCRC(vHdr, payload.data()) != badCrc);
+
+    // 6. Empty payload
+    VideoPacketHeader emptyHdr = vHdr;
+    emptyHdr.payloadSize = 0;
+    emptyHdr.crc32 = CalculateVideoPacketCRC(emptyHdr, nullptr);
+    assert(CalculateVideoPacketCRC(emptyHdr, nullptr) == emptyHdr.crc32);
+
+    // 7. Maximum payload fragment (64 KB)
+    std::vector<uint8_t> maxPayload(64 * 1024, 0x7E);
+    VideoPacketHeader maxHdr = vHdr;
+    maxHdr.payloadSize = static_cast<uint16_t>(maxPayload.size());
+    maxHdr.crc32 = CalculateVideoPacketCRC(maxHdr, maxPayload.data());
+    assert(CalculateVideoPacketCRC(maxHdr, maxPayload.data()) == maxHdr.crc32);
+
+    std::cout << "[PASS] Comprehensive CRC-32 integrity suite passed.\n" << std::endl;
+}
+
 void TestInputEventPacking() {
     std::cout << "[TEST] Validating InputEvent 22-byte Packing..." << std::endl;
 
@@ -113,22 +259,21 @@ void TestTelemetryPacking() {
     telem.packetLossPercent = 0.0f;
     telem.frameDrops = 0;
     telem.jitterMs = 0.3f;
-    telem.isMeasured = 1;
+    telem.isMeasured = 0; // 0 = Performance Model Target, 1 = Physical measurement
 
     uint8_t buf[sizeof(TelemetryData)];
     std::memcpy(buf, &telem, sizeof(TelemetryData));
 
-    // Validate byte 36 is the isMeasured flag
-    assert(buf[36] == 1);
+    assert(buf[36] == 0);
 
     TelemetryData restored = {};
     std::memcpy(&restored, buf, sizeof(TelemetryData));
     assert(restored.fps == 60.0f);
     assert(restored.bitrateMbps == 8.0f);
     assert(restored.rttMs == 3.2f);
-    assert(restored.isMeasured == 1);
+    assert(restored.isMeasured == 0);
 
-    std::cout << "[PASS] TelemetryData layout and byte 36 flag validated.\n" << std::endl;
+    std::cout << "[PASS] TelemetryData layout validated.\n" << std::endl;
 }
 
 int main() {
@@ -138,6 +283,9 @@ int main() {
 
     TestStructSizes();
     TestHeaderSerialization();
+    TestVideoPacketHeaderSerialization();
+    TestDisplayConfigAckPacking();
+    TestCRC32Comprehensive();
     TestInputEventPacking();
     TestTelemetryPacking();
 

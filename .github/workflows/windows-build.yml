@@ -81,7 +81,7 @@ jobs:
       - name: Build and run cross-platform unit tests
         shell: pwsh
         run: |
-          cmake --build build --config Release --target test_protocol test_framing test_pipeline
+          cmake --build build --config Release --target test_protocol test_framing test_pipeline test_h264_bitstream test_session_security_perf
           ctest --test-dir build -C Release --output-on-failure
 
       # ------------------------------------------------------------------

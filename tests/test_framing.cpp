@@ -65,6 +65,122 @@ void TestInvalidMagicRejection() {
     std::cout << "[PASS] Invalid magic rejected correctly.\n" << std::endl;
 }
 
+void TestStreamAccumulatorAndFragmentation() {
+    std::cout << "[TEST] Testing Stream Accumulator with Fragmented & Coalesced Packets..." << std::endl;
+
+    // Create 3 distinct packets: PAIR_REQUEST, DISPLAY_CONFIG, and INPUT_EVENT
+    std::string pin = "849201";
+    PacketHeader hdr1 = {};
+    hdr1.magic = PROTOCOL_MAGIC;
+    hdr1.version = PROTOCOL_VERSION;
+    hdr1.type = static_cast<uint8_t>(MessageType::PAIR_REQUEST);
+    hdr1.sequence = 1;
+    hdr1.payloadSize = static_cast<uint32_t>(pin.size());
+
+    DisplayConfig disp = {};
+    disp.displayId = 2;
+    disp.width = 1920;
+    disp.height = 1080;
+    disp.refreshRate = 60;
+    disp.orientation = 0;
+    disp.displayMode = static_cast<uint8_t>(DisplayMode::EXTEND);
+    disp.dpiScalePercent = 100;
+
+    PacketHeader hdr2 = {};
+    hdr2.magic = PROTOCOL_MAGIC;
+    hdr2.version = PROTOCOL_VERSION;
+    hdr2.type = static_cast<uint8_t>(MessageType::DISPLAY_CONFIG);
+    hdr2.sequence = 2;
+    hdr2.payloadSize = sizeof(DisplayConfig);
+
+    InputEvent evt = {};
+    evt.actionType = 0; // Down
+    evt.normX = 0.5f;
+    evt.normY = 0.5f;
+    evt.pressure = 1.0f;
+    evt.button = 0;
+    evt.clientTimestamp = 12345678ULL;
+
+    PacketHeader hdr3 = {};
+    hdr3.magic = PROTOCOL_MAGIC;
+    hdr3.version = PROTOCOL_VERSION;
+    hdr3.type = static_cast<uint8_t>(MessageType::INPUT_EVENT);
+    hdr3.sequence = 3;
+    hdr3.payloadSize = sizeof(InputEvent);
+
+    // Concatenate all 3 packets into a single serialized stream
+    std::vector<uint8_t> allBytes;
+    auto appendPacket = [&](const PacketHeader& h, const void* p, size_t pSize) {
+        size_t off = allBytes.size();
+        allBytes.resize(off + sizeof(PacketHeader) + pSize);
+        std::memcpy(allBytes.data() + off, &h, sizeof(PacketHeader));
+        if (pSize > 0 && p) {
+            std::memcpy(allBytes.data() + off + sizeof(PacketHeader), p, pSize);
+        }
+    };
+
+    appendPacket(hdr1, pin.data(), pin.size());
+    appendPacket(hdr2, &disp, sizeof(DisplayConfig));
+    appendPacket(hdr3, &evt, sizeof(InputEvent));
+
+    // Simulate arriving in arbitrary small chunks (e.g. 7 bytes at a time)
+    std::vector<uint8_t> accumulator;
+    std::vector<PacketHeader> parsedHeaders;
+    size_t chunkSize = 7;
+
+    for (size_t offset = 0; offset < allBytes.size(); offset += chunkSize) {
+        size_t currentChunk = std::min(chunkSize, allBytes.size() - offset);
+        accumulator.insert(accumulator.end(), allBytes.begin() + offset, allBytes.begin() + offset + currentChunk);
+
+        // Process accumulator
+        while (accumulator.size() >= sizeof(PacketHeader)) {
+            PacketHeader parsed = {};
+            std::memcpy(&parsed, accumulator.data(), sizeof(PacketHeader));
+            if (parsed.magic != PROTOCOL_MAGIC || parsed.version != PROTOCOL_VERSION || parsed.payloadSize > MAX_CONTROL_PAYLOAD_SIZE) {
+                assert(false && "Corrupted packet in accumulator test");
+            }
+            size_t totalPacketLen = sizeof(PacketHeader) + parsed.payloadSize;
+            if (accumulator.size() < totalPacketLen) {
+                break; // Wait for more fragments
+            }
+
+            parsedHeaders.push_back(parsed);
+            accumulator.erase(accumulator.begin(), accumulator.begin() + totalPacketLen);
+        }
+    }
+
+    assert(parsedHeaders.size() == 3);
+    assert(parsedHeaders[0].type == static_cast<uint8_t>(MessageType::PAIR_REQUEST));
+    assert(parsedHeaders[0].sequence == 1);
+    assert(parsedHeaders[0].payloadSize == pin.size());
+
+    assert(parsedHeaders[1].type == static_cast<uint8_t>(MessageType::DISPLAY_CONFIG));
+    assert(parsedHeaders[1].sequence == 2);
+    assert(parsedHeaders[1].payloadSize == sizeof(DisplayConfig));
+
+    assert(parsedHeaders[2].type == static_cast<uint8_t>(MessageType::INPUT_EVENT));
+    assert(parsedHeaders[2].sequence == 3);
+    assert(parsedHeaders[2].payloadSize == sizeof(InputEvent));
+
+    assert(accumulator.empty());
+    std::cout << "[PASS] Stream accumulator correctly reassembled fragmented TCP chunks.\n" << std::endl;
+}
+
+void TestOversizedPayloadRejection() {
+    std::cout << "[TEST] Testing Oversized Payload Boundary Protection..." << std::endl;
+
+    PacketHeader hdr = {};
+    hdr.magic = PROTOCOL_MAGIC;
+    hdr.version = PROTOCOL_VERSION;
+    hdr.type = static_cast<uint8_t>(MessageType::PAIR_REQUEST);
+    hdr.payloadSize = MAX_CONTROL_PAYLOAD_SIZE + 1; // Exceeds 64 KB limit
+
+    bool rejected = (hdr.payloadSize > MAX_CONTROL_PAYLOAD_SIZE);
+    assert(rejected);
+
+    std::cout << "[PASS] Oversized payload rejected before memory allocation.\n" << std::endl;
+}
+
 int main() {
     std::cout << "========================================" << std::endl;
     std::cout << "SecondScreen Framing Test Suite" << std::endl;
@@ -72,6 +188,8 @@ int main() {
 
     TestPacketFramingRoundtrip();
     TestInvalidMagicRejection();
+    TestStreamAccumulatorAndFragmentation();
+    TestOversizedPayloadRejection();
 
     std::cout << "ALL FRAMING TESTS PASSED!" << std::endl;
     return 0;

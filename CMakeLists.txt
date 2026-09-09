@@ -71,3 +71,15 @@ add_executable(test_pipeline
 )
 target_include_directories(test_pipeline PRIVATE core/protocol native/windows)
 add_test(NAME PipelineTest COMMAND test_pipeline)
+
+add_executable(test_h264_bitstream
+    tests/test_h264_bitstream.cpp
+)
+target_include_directories(test_h264_bitstream PRIVATE core/protocol)
+add_test(NAME BitstreamTest COMMAND test_h264_bitstream)
+
+add_executable(test_session_security_perf
+    tests/test_session_security_perf.cpp
+)
+target_include_directories(test_session_security_perf PRIVATE core/protocol)
+add_test(NAME SessionSecurityPerfTest COMMAND test_session_security_perf)
