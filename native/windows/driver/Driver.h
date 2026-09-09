@@ -4,6 +4,12 @@
 #pragma once
 
 #define NOMINMAX
+
+// The WDK 28000 runner exposes the IddCx 1.4 header set. IddCxFuncEnum.h
+// requires the driver to select the API version before including iddcx.h.
+#define IDDCX_VERSION_MAJOR 1
+#define IDDCX_VERSION_MINOR 4
+
 #include <windows.h>
 #include <bugcodes.h>
 #include <wdf.h>
