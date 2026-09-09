@@ -1,0 +1,61 @@
+; SecondScreen IddCx Virtual Display Driver INF File
+; Copyright (c) 2026 SecondScreen Project. All rights reserved.
+
+[Version]
+Signature="$Windows NT$"
+Class=Display
+ClassGuid={4d36e968-e325-11ce-bfc1-08002be10318}
+Provider=%ManufacturerName%
+CatalogFile=SecondScreenIddCx.cat
+DriverVer=08/19/2026,1.0.0.1
+PnpLockdown=1
+
+[Manufacturer]
+%ManufacturerName%=Standard,NTamd64
+
+[Standard.NTamd64]
+%DeviceName%=SecondScreen_Device, Root\SecondScreenVirtualDisplay
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+SecondScreenIddCx.dll = 1
+
+[DestinationDirs]
+DefaultDestDir = 12
+UMDriverCopy   = 12,UMDF
+
+; ================= Class Installation =================
+
+[SecondScreen_Device.NT]
+CopyFiles=UMDriverCopy
+
+[SecondScreen_Device.NT.hw]
+
+[SecondScreen_Device.NT.Services]
+AddService=WUDFRd,0x000001fa,WUDFRD_ServiceInstall
+
+[WUDFRD_ServiceInstall]
+DisplayName=%WudfRdDisplayName%
+ServiceType=1
+StartType=3
+ErrorControl=1
+ServiceBinary=%12%\WUDFRd.sys
+
+[SecondScreen_Device.NT.Wdf]
+UmdfService=SecondScreenIddCx,SecondScreen_Install
+UmdfServiceOrder=SecondScreenIddCx
+
+[SecondScreen_Install]
+UmdfLibraryVersion=2.25.0
+ServiceBinary=%12%\UMDF\SecondScreenIddCx.dll
+
+[UMDriverCopy]
+SecondScreenIddCx.dll
+
+[Strings]
+ManufacturerName="SecondScreen Project"
+DiskName="SecondScreen Driver Installation Disk"
+DeviceName="SecondScreen Virtual Display (Display 2)"
+WudfRdDisplayName="Windows Driver Foundation - User-mode Driver Framework Reflector"

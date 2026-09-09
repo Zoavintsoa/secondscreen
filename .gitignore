@@ -1,0 +1,32 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# C++ / Windows build outputs
+x64/
+x86/
+out/
+artifacts/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+*.cat
+.vs/
+*.user
+*.suo
+
+# Inno Setup output
+installer/Output/

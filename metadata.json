@@ -1,0 +1,6 @@
+{
+  "name": "SecondScreen",
+  "description": "Système professionnel de deuxième écran virtuel multiplateforme (Windows/macOS -> Android/iOS) avec capture GPU, protocole basse latence, gestion Display 2 réel et mode DaVinci Resolve.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
