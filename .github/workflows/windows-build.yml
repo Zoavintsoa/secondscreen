@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    runs-on: windows-2025
     timeout-minutes: 60
 
     steps:
@@ -24,14 +24,8 @@ jobs:
         uses: actions/checkout@v4
 
       # ------------------------------------------------------------------
-      # ÉTAPE À RISQUE : le runner windows-latest a Visual Studio 2022 et le
-      # Windows SDK, mais PAS le Windows Driver Kit (WDK) par défaut.
-      # On utilise ici la configuration winget officielle publiée par
-      # Microsoft dans le dépôt Windows-driver-samples (celui-là même dont
-      # notre driver IddCx est dérivé) pour installer VS + WDK + SDK de
-      # façon non interactive. C'est le point le plus susceptible d'échouer
-      # au premier run : si winget configure échoue ici, regarder le log de
-      # cette étape en premier avant toute autre chose (Étape 5 du plan).
+      # ÉTAPE À RISQUE : le runner Windows 2025 dispose de WinGet. Le WDK
+      # est installé via la configuration officielle Microsoft.
       # ------------------------------------------------------------------
       - name: Install Windows Driver Kit (WDK) via winget configure
         shell: pwsh
@@ -39,7 +33,6 @@ jobs:
           winget configure -f `
             "https://raw.githubusercontent.com/microsoft/Windows-driver-samples/main/_wdk_utils/winget/configs/wdk-vscommunity.dsc.yaml" `
             --accept-configuration-agreements `
-            --accept-package-agreements `
             --disable-interactivity
 
       - name: Verify WDK installation
