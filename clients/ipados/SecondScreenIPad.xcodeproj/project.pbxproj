@@ -47,7 +47,7 @@
 
 /* Begin XCConfigurationList section */
     A00000000000000000000050 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000070, A00000000000000000000071,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-    A00000000000000000000051 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000072, A000000000000000000000073,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+    A00000000000000000000051 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000072, A00000000000000000000073,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
  };
  rootObject = A00000000000000000000041;
