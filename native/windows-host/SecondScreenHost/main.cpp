@@ -1,6 +1,8 @@
 #include <windows.h>
 #include <objbase.h>
 #include <iostream>
+
+#include "../../shared-protocol/BRAND_IDENTITY.h"
 #include "host/HostServer.h"
 
 int wmain() {
@@ -10,8 +12,11 @@ int wmain() {
         return 1;
     }
 
-    std::wcout << L"SecondScreen Windows Host\n";
+    std::wcout << L"SecondScreen — Zoavintsoa\n";
     std::wcout << L"Virtual display -> GPU frame -> H.264 -> LAN stream\n";
+    std::wcout << L"Product namespace: "
+               << secondscreen::identity::kBundleNamespace
+               << L"\n";
 
     second_screen::HostServer server;
     if (!server.start()) {
