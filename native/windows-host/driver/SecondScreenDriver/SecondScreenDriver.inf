@@ -10,7 +10,7 @@ Class = Display
 ClassVer = 2.0
 Provider=%ManufacturerName%
 CatalogFile=SecondScreenDriver.cat
-DriverVer= ; TODO: set DriverVer in stampinf property pages
+DriverVer=10/08/2026,1.0.0.0
 
 [Manufacturer]
 %ManufacturerName%=Standard,NT$ARCH$.10.0...22000
@@ -64,9 +64,9 @@ SecondScreenDriver.dll
 ; =================== Generic ==================================
 
 [Strings]
-ManufacturerName="<Your manufacturer name>" ; TODO: Replace with your manufacturer name
-DiskName = "SecondScreenDriver Installation Disk" ; TODO: Replace with driver disk name
-DeviceName="SecondScreenDriver Device" ; TODO: Replace with correct device name
+ManufacturerName="Zoavintsoa" ; TODO: Replace with your manufacturer name
+DiskName = "SecondScreen Virtual Display" ; TODO: Replace with driver disk name
+DeviceName="SecondScreen Virtual Display" ; TODO: Replace with correct device name
 
 REG_MULTI_SZ  = 0x00010000
 REG_SZ        = 0x00000000
