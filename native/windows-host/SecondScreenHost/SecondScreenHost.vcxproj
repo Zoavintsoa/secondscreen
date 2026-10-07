@@ -40,6 +40,7 @@
     <ClCompile Include="host\DriverFrameReceiver.cpp" />
     <ClCompile Include="..\..\shared-protocol\CONTROL_PROTOCOL.cpp" />
     <ClCompile Include="..\..\shared-protocol\VIDEO_FRAGMENT.cpp" />
+    <ClCompile Include="..\..\shared-protocol\CONTROL_SESSION.cpp" />
   </ItemGroup>
 
   <ItemGroup>
@@ -54,6 +55,7 @@
     <ClInclude Include="host\DriverFrameReceiver.h" />
     <ClInclude Include="..\..\shared-protocol\CONTROL_PROTOCOL.h" />
     <ClInclude Include="..\..\shared-protocol\VIDEO_FRAGMENT.h" />
+    <ClInclude Include="..\..\shared-protocol\CONTROL_SESSION.h" />
   </ItemGroup>
 
   <PropertyGroup>
