@@ -5,6 +5,7 @@
 
 #include <array>
 #include <cctype>
+#include <condition_variable>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -40,6 +41,7 @@ struct MsQuicServer::Impl {
     ConnectionContext* connectionContext{nullptr};
 
     std::mutex stateMutex;
+    std::condition_variable stateCv;
 };
 
 namespace {
@@ -156,6 +158,7 @@ void finishConnection(ConnectionContext* ctx) {
     }
 
     delete ctx;
+    impl->stateCv.notify_all();
 }
 
 QUIC_STATUS QUIC_API streamCallback(
@@ -602,6 +605,10 @@ void MsQuicServer::stop() {
             impl_->connectionContext->connection,
             QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT,
             0);
+        std::unique_lock lock(impl_->stateMutex);
+        impl_->stateCv.wait(lock, [this] {
+            return impl_->connectionContext == nullptr;
+        });
     }
 
     if (impl_->configuration) {
