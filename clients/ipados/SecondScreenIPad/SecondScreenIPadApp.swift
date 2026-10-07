@@ -135,12 +135,11 @@ private struct LegalSheet: View {
             Text(body)
                 .frame(maxWidth:.infinity, alignment:.leading)
                 .padding(24)
-                .textSelection(.enabled)
         }
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationView {
             bodyView
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
