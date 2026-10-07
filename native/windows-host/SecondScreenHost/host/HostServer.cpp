@@ -23,6 +23,10 @@ bool HostServer::start() {
 
     // Discovery/control/stream services are intentionally separated from
     // the IddCx driver. This keeps network failures out of the display path.
+    if (!discovery_.start("SecondScreen Host", 49152)) {
+        stop();
+        return false;
+    }
     return true;
 }
 
@@ -31,6 +35,7 @@ void HostServer::stop() {
         return;
     }
 
+    discovery_.stop();
     controlThread_.reset();
     discoveryThread_.reset();
     WSACleanup();
