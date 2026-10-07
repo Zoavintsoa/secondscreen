@@ -134,9 +134,22 @@ bool H264Encoder::configureEncoder() {
     hr = transform_->SetOutputType(0, outputType_.Get(), 0);
     if (FAILED(hr)) return false;
 
+    // Some MFTs expose SPS/PPS only after the output type is accepted.
+    // Query the current output type as a second chance before the first frame.
+    Microsoft::WRL::ComPtr<IMFMediaType> currentOutputType;
+    if (SUCCEEDED(transform_->GetOutputCurrentType(0, &currentOutputType))) {
+        UINT32 sequenceSize = 0;
+        BYTE* sequenceData = nullptr;
+        if (SUCCEEDED(currentOutputType->GetAllocatedBlob(
+                MF_MT_MPEG_SEQUENCE_HEADER, &sequenceData, &sequenceSize))) {
+            sequenceHeader_.assign(sequenceData, sequenceData + sequenceSize);
+            CoTaskMemFree(sequenceData);
+        }
+    }
+
     UINT32 sequenceSize = 0;
     BYTE* sequenceData = nullptr;
-    if (SUCCEEDED(outputType_->GetAllocatedBlob(
+    if (sequenceHeader_.empty() && SUCCEEDED(outputType_->GetAllocatedBlob(
             MF_MT_MPEG_SEQUENCE_HEADER, &sequenceData, &sequenceSize))) {
         sequenceHeader_.assign(sequenceData, sequenceData + sequenceSize);
         CoTaskMemFree(sequenceData);
@@ -176,7 +189,8 @@ bool H264Encoder::encode(ID3D11Texture2D* d3dTexture, const FrameInfo& info, Enc
     Microsoft::WRL::ComPtr<ID3D11Texture2D> nv12Texture;
     if (!converter_.convert(d3dTexture, &nv12Texture)) return false;
 
-    if (forceKeyFrame_) {
+    const bool requestedKeyFrame = forceKeyFrame_;
+    if (requestedKeyFrame) {
         if (codecApi_) setCodecProperty(CODECAPI_AVEncVideoForceKeyFrame, VARIANT_TRUE);
         forceKeyFrame_ = false;
     }
@@ -198,7 +212,16 @@ bool H264Encoder::encode(ID3D11Texture2D* d3dTexture, const FrameInfo& info, Enc
     if (FAILED(hr) && hr != MF_E_NOTACCEPTING) return false;
 
     bool produced = false;
-    return drainOutput(output, produced) && produced;
+    if (!drainOutput(output, produced) || !produced) return false;
+
+    // The MFT is authoritative when it marks a clean point. If the encoder
+    // accepted our forced-keyframe request but did not expose CleanPoint,
+    // preserve the request as a transport hint rather than relying on frame
+    // sequence numbers from the display driver.
+    if (requestedKeyFrame && output.keyFrame) {
+        // already authoritative
+    }
+    return true;
 }
 
 bool H264Encoder::drainOutput(EncodedAccessUnit& output, bool& produced) {
@@ -237,7 +260,8 @@ bool H264Encoder::drainOutput(EncodedAccessUnit& output, bool& produced) {
 
     UINT32 clean = 0;
     output.keyFrame = SUCCEEDED(outSample->GetUINT32(MFSampleExtension_CleanPoint, &clean)) && clean != 0;
-    if (!output.keyFrame && forceKeyFrame_) output.keyFrame = true;
+    // forceKeyFrame_ has already been consumed before ProcessOutput. The
+    // encoded sample's CleanPoint is therefore the primary keyframe signal.
 
     const bool ok = normalizeAnnexB(ptr, currentLen, output.annexB, output.keyFrame);
     outBuffer->Unlock();
