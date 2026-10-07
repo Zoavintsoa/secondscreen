@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 #include <functional>
+#include <utility>
 
 namespace second_screen::control {
 
