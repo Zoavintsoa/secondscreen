@@ -93,7 +93,7 @@ Production uses MsQuic:
 - reliable stream for control;
 - datagrams for video.
 
-MsQuic support covers Windows and Linux/Android, making it suitable for a common application protocol with native platform adapters.
+MsQuic officially supports Windows and Linux. Current Microsoft documentation says it may work on Android, but without the same support guarantee; therefore the Android transport remains an adapter boundary until real-device validation.
 
 ## Android
 
@@ -171,3 +171,36 @@ No simulator checkbox satisfies these gates.
 8. Workspace profiles.
 9. Windows productization.
 10. macOS/iPadOS native tracks.
+
+
+## Verification pass — 2026-10-08
+
+The architecture was checked against current Microsoft documentation before the next implementation step.
+
+Confirmed:
+- IddCx is the correct Windows model for virtual displays and network remote-display scenarios.
+- The swap-chain processing loop is performance-critical and heavy work should be moved out of it.
+- IddCx exposes realtime GPU priority on supported Windows 11 systems.
+- IddCx 1.10 adds HDR10 and SDR WCG support for indirect displays.
+- Refresh rate and resolution are negotiated as supported target modes.
+- MsQuic provides reliable streams and unreliable QUIC datagrams.
+
+Corrections made:
+- Windows host project source paths were corrected so the actual host subdirectory files are included.
+- The frame receiver source/header were restored to the Visual Studio project.
+- Discovery/video ports are separated.
+- Android is no longer described as an officially supported MsQuic platform; its transport remains replaceable.
+- H.264 MFT output handling now respects whether the encoder supplies its own output samples.
+- A malformed output-buffer error path was corrected.
+- Keyframe state remains encoder-controlled rather than display-sequence-controlled.
+
+Not tested in this pass:
+- driver installation;
+- Windows virtual-monitor enumeration;
+- GPU frame capture;
+- hardware encoding;
+- LAN streaming;
+- Android decoding;
+- QUIC connectivity.
+
+Those remain for the planned real-hardware validation.
