@@ -21,10 +21,12 @@
 ### Production path — not hardware accepted yet
 
 - [ ] Harden IddCx frame handoff and keep driver frame loop minimal
+- [x] Harden pairing credential comparison against timing leaks
 - [ ] MsQuic host transport
 - [ ] MsQuic Android transport adapter
 - [ ] Authenticated pairing end-to-end
-- [ ] Control protocol implementation
+- [x] Bounded control-frame parser and framing implementation
+- [x] QUIC datagram video fragmentation contract
 - [ ] Dynamic STREAM_CONFIG on Android
 - [ ] Keyframe request/recovery
 - [ ] Adaptive bitrate/FPS controller
