@@ -1,57 +1,19 @@
-# SecondScreen Transport Architecture
+# SecondScreen transport
 
-## Production
-
-Production transport is QUIC.
-
-- Reliable bidirectional stream: HELLO, pairing, authentication, configuration, control, input and telemetry.
-- QUIC datagrams: video access units.
-- TLS 1.3 is provided by QUIC.
-- Video loss must not block later video.
-- Control remains reliable even when video is lost.
-
-The Windows host targets Microsoft MsQuic. MsQuic officially supports Windows and Linux; its current documentation describes Android as a platform it may work on, but without the same support guarantee as Windows/Linux. We therefore keep a native transport abstraction and will validate the Android MsQuic route before making it the only Android production option.
-
-## Bring-up
-
-The current TCP video server is deliberately isolated:
-- discovery UDP: 49151;
-- future control: 49152;
-- temporary video TCP: 49153.
-
-The temporary TCP path exists only to validate the encoder, decoder and packetization. It must never be mistaken for the production transport.
-
-## Transport abstraction
-
-The native code should expose:
-- IControlChannel;
-- IVideoChannel;
-- ITransportSession.
-
-The display and encoder layers must not know whether bytes travel over TCP, MsQuic or another platform-native QUIC implementation.
-
-## Migration order
-
-1. Keep TCP bring-up stable.
-2. Add MsQuic host adapter.
-3. Add Android MsQuic native library/JNI adapter.
-4. Move control messages to reliable QUIC stream.
-5. Move video to QUIC datagrams.
-6. Add loss/recovery telemetry.
-7. Remove TCP from production packaging.
+## Production path
+- QUIC connection secured by TLS.
+- One reliable bidirectional QUIC stream carries SSCP control frames.
+- QUIC datagrams carry SSVG video fragments.
+- Datagram size is learned from MsQuic after negotiation; it is never hard-coded as the production limit.
+- Loss of a video fragment invalidates the affected access unit.
+- The client waits for/request a keyframe before resuming decode after a lost access unit.
+- TCP/SSVF remains a bring-up compatibility path only.
 
 ## Security
+The six-digit pairing code is a user confirmation mechanism, not the transport secret. TLS protects the QUIC channel. The host issues a separate random session credential after successful pairing. Host identity must be pinned or explicitly trusted during the first pairing flow. Certificate material must never be derived from the six-digit code.
 
-Authentication is application-level identity layered on top of QUIC:
-- pairing code for first authorization;
-- random per-device session credential;
-- revocation;
-- authenticated input.
+## Adapter boundary
+QUIC_TRANSPORT.h defines the transport-neutral contract. The Windows MsQuic implementation is isolated in MsQuicServer.* so the host core does not depend on MsQuic symbols. The current adapter is SDK-gated and does not report false success when MsQuic is unavailable.
 
-The pairing code must never become the session secret.
-
-
-## Current implementation status
-The shared control protocol and session state machine are now connected to the Windows TCP bring-up path. This is intentionally a staging layer: production transport remains MsQuic with a reliable control stream and QUIC datagrams. The legacy TCP video path is not considered the production transport.
-
-MsQuic is the next transport implementation. The Android transport stays behind the adapter boundary because official MsQuic platform support does not make Android a guaranteed production target yet.
+## Platform
+MsQuic provides reliable streams and secure unreliable datagrams. Datagram reception must be enabled/negotiated by both peers, and the peer's supported datagram size is learned from the connection. Android remains an adapter boundary until real-device acceptance.
