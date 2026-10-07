@@ -175,7 +175,7 @@ bool H264Encoder::encode(ID3D11Texture2D* d3dTexture, const FrameInfo& info, Enc
 
     Microsoft::WRL::ComPtr<IMFMediaBuffer> mediaBuffer;
     HRESULT hr = MFCreateDXGISurfaceBuffer(
-        __uuidof(ID3D11Texture2D), d3dTexture, 0, FALSE, &mediaBuffer);
+        __uuidof(ID3D11Texture2D), nv12Texture.Get(), 0, FALSE, &mediaBuffer);
     if (FAILED(hr)) return false;
 
     Microsoft::WRL::ComPtr<IMFSample> sample;
