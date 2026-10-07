@@ -89,6 +89,8 @@ namespace Microsoft
             Microsoft::WRL::Wrappers::Event m_hTerminateEvent;
             DriverFramePublisher m_FramePublisher;
             bool m_FramePublisherInitialized{false};
+            uint32_t m_FramePublisherWidth{0};
+            uint32_t m_FramePublisherHeight{0};
         };
 
         /// <summary>
