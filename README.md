@@ -58,6 +58,19 @@ Initial architecture supports:
 
 These roles are layered above the core display and transport path.
 
+## Product identity
+
+**SecondScreen — Zoavintsoa**
+
+The product identity is intentionally embedded in the native codebase, application identifiers, desktop/mobile metadata and user-facing About surfaces. The original project identity must remain distinguishable from third-party dependencies.
+
+Legal and product documents:
+- TERMS_OF_USE.md
+- PRIVACY.md
+- ACCESSIBILITY.md
+- ABOUT.md
+- THIRD_PARTY_NOTICES.md
+
 ## Engineering rules
 
 1. Native functionality takes priority over UI mockups.
