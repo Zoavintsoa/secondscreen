@@ -36,7 +36,8 @@ class ControlClient(private val socket:Socket) {
         val response=receive() ?: return ControlResult(false)
         if(response.type!=0x03 || !response.json.contains("\"status\":\"paired\"")) return ControlResult(false)
         val token=Regex("\"sessionToken\"\\s*:\\s*\"([^\"]{64})\"").find(response.json)?.groupValues?.get(1)
-        return ControlResult(token!=null,token)
+        val config=StreamConfig.parse(response.json)
+        return ControlResult(token!=null,token,config)
     }
 
     fun requestKeyframe(){send(0x0C,"{}")}
