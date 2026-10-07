@@ -162,7 +162,7 @@ void HostServer::onFrame(ID3D11Texture2D* texture, const FrameInfo& info) {
             const uint8_t flags = accessUnit.keyFrame ? 0x01 : 0x00;
             const auto fragments = video::fragmentAccessUnit(
                 ++quicFrameId_,
-                video::Codec::H264,
+                1,
                 flags,
                 timestamp,
                 accessUnit.annexB,
