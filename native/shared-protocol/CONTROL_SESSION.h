@@ -3,6 +3,7 @@
 #include "CONTROL_PROTOCOL.h"
 #include <cstdint>
 #include <string>
+#include <functional>
 
 namespace second_screen::control {
 
@@ -31,7 +32,15 @@ struct SessionAction {
 
 class ControlSession {
 public:
-    explicit ControlSession(uint32_t maxPayloadBytes = kDefaultMaxPayloadBytes);
+    struct SecurityCallbacks {
+        std::function<bool(const std::string&, const std::string&)> validateSessionToken;
+        std::function<bool(const std::string&, const std::string&)> confirmPairingCode;
+        std::function<std::string(const std::string&)> issueSessionToken;
+    };
+
+    explicit ControlSession(
+        SecurityCallbacks security = {},
+        uint32_t maxPayloadBytes = kDefaultMaxPayloadBytes);
 
     void reset();
     SessionAction onMessage(const ControlMessage& message);
