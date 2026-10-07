@@ -19,6 +19,7 @@ struct TransportCallbacks {
     std::function<void(bool)> onAuthenticated;
     std::function<void()> onKeyframeRequested;
     std::function<void(const std::string&, const std::string&)> onPairingChallenge;
+    std::function<std::string(const std::string&)> createPairingChallenge;
 
     std::function<bool(const std::string&, const std::string&)> validateSessionToken;
     std::function<bool(const std::string&, const std::string&)> confirmPairingCode;
