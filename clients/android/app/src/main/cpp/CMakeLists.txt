@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(secondscreen_quic)
+add_library(secondscreen_quic SHARED secondscreen_quic_jni.cpp)
+target_compile_features(secondscreen_quic PRIVATE cxx_std_17)
+find_library(log-lib log)
+target_link_libraries(secondscreen_quic PRIVATE \${log-lib})
