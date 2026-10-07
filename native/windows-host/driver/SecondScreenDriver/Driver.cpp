@@ -1,6 +1,6 @@
 /*++
 
-Copyright (c) SecondScreen Corporation
+Copyright (c) Microsoft Corporation
 
 Abstract:
 
@@ -19,8 +19,8 @@ Environment:
 #include "Driver.tmh"
 
 using namespace std;
-using namespace SecondScreen::IndirectDisp;
-using namespace SecondScreen::WRL;
+using namespace Microsoft::IndirectDisp;
+using namespace Microsoft::WRL;
 
 #pragma region SampleMonitors
 
@@ -502,7 +502,7 @@ void IndirectDeviceContext::InitAdapter()
 
     // Declare your device strings for telemetry (required)
     AdapterCaps.EndPointDiagnostics.pEndPointFriendlyName = L"SecondScreen Device";
-    AdapterCaps.EndPointDiagnostics.pEndPointManufacturerName = L"SecondScreen";
+    AdapterCaps.EndPointDiagnostics.pEndPointManufacturerName = L"Microsoft";
     AdapterCaps.EndPointDiagnostics.pEndPointModelName = L"SecondScreen Model";
 
     // Declare your hardware and firmware versions (required)
