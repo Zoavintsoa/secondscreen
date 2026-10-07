@@ -60,11 +60,12 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <WarningLevel>Level4</WarningLevel>
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\shared-protocol;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\shared-protocol;$(VCPKG_ROOT)\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
-      <AdditionalDependencies>Ws2_32.lib;Mfplat.lib;Mf.lib;Mfuuid.lib;Shlwapi.lib;Bcrypt.lib;D3D11.lib;DXGI.lib;Ole32.lib;Advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Ws2_32.lib;Mfplat.lib;Mf.lib;Mfuuid.lib;Shlwapi.lib;Bcrypt.lib;D3D11.lib;DXGI.lib;Ole32.lib;Advapi32.lib;msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(VCPKG_ROOT)\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)Microsoft.Cpp.targets" />
