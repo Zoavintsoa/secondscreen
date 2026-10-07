@@ -226,47 +226,67 @@ bool H264Encoder::encode(ID3D11Texture2D* d3dTexture, const FrameInfo& info, Enc
 
 bool H264Encoder::drainOutput(EncodedAccessUnit& output, bool& produced) {
     produced = false;
+
     MFT_OUTPUT_STREAM_INFO streamInfo{};
     if (FAILED(transform_->GetOutputStreamInfo(0, &streamInfo))) return false;
 
-    std::vector<uint8_t> buffer(std::max<DWORD>(streamInfo.cbSize, 1024u));
     Microsoft::WRL::ComPtr<IMFMediaBuffer> outBuffer;
-    HRESULT hr = MFCreateMemoryBuffer(static_cast<DWORD>(buffer.size()), &outBuffer);
-    if (FAILED(hr)) return false);
-
     Microsoft::WRL::ComPtr<IMFSample> outSample;
-    hr = MFCreateSample(&outSample);
-    if (FAILED(hr)) return false;
-    outSample->AddBuffer(outBuffer.Get());
-
     MFT_OUTPUT_DATA_BUFFER data{};
     data.dwStreamID = 0;
-    data.pSample = outSample.Get();
+
+    // MFT_OUTPUT_STREAM_PROVIDES_SAMPLES means the encoder owns allocation.
+    // Otherwise the caller must provide the output sample.
+    if ((streamInfo.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES) == 0) {
+        const DWORD capacity = std::max<DWORD>(streamInfo.cbSize, 1024u);
+        HRESULT hr = MFCreateMemoryBuffer(capacity, &outBuffer);
+        if (FAILED(hr)) return false;
+
+        hr = MFCreateSample(&outSample);
+        if (FAILED(hr)) return false;
+
+        if (FAILED(outSample->AddBuffer(outBuffer.Get()))) return false;
+        data.pSample = outSample.Get();
+    }
 
     DWORD status = 0;
-    hr = transform_->ProcessOutput(0, 1, &data, &status);
+    HRESULT hr = transform_->ProcessOutput(0, 1, &data, &status);
     if (hr == MF_E_TRANSFORM_NEED_MORE_INPUT) return true;
     if (FAILED(hr)) return false;
 
+    if (!data.pSample) return false;
+
+    if (!outSample) {
+        outSample = data.pSample;
+    }
+
+    if (!outBuffer) {
+        hr = outSample->GetBufferByIndex(0, &outBuffer);
+        if (FAILED(hr) || !outBuffer) return false;
+    }
+
     BYTE* ptr = nullptr;
-    DWORD maxLen = 0, currentLen = 0;
+    DWORD maxLen = 0;
+    DWORD currentLen = 0;
     hr = outBuffer->Lock(&ptr, &maxLen, &currentLen);
     if (FAILED(hr)) return false;
 
     output.annexB.clear();
+
     LONGLONG sampleTime = 0;
     output.timestampUs = SUCCEEDED(outSample->GetSampleTime(&sampleTime))
-        ? static_cast<uint64_t>(sampleTime / 10) : 0;
+        ? static_cast<uint64_t>(sampleTime / 10)
+        : 0;
 
     UINT32 clean = 0;
-    output.keyFrame = SUCCEEDED(outSample->GetUINT32(MFSampleExtension_CleanPoint, &clean)) && clean != 0;
-    // forceKeyFrame_ has already been consumed before ProcessOutput. The
-    // encoded sample's CleanPoint is therefore the primary keyframe signal.
+    output.keyFrame =
+        SUCCEEDED(outSample->GetUINT32(MFSampleExtension_CleanPoint, &clean)) &&
+        clean != 0;
 
     const bool ok = normalizeAnnexB(ptr, currentLen, output.annexB, output.keyFrame);
     outBuffer->Unlock();
-    if (!ok) return false;
 
+    if (!ok) return false;
     produced = !output.annexB.empty();
     return produced;
 }
