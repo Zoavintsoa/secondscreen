@@ -17,7 +17,7 @@
 
 #include "Trace.h"
 
-namespace SecondScreen
+namespace Microsoft
 {
     namespace WRL
     {
@@ -29,7 +29,7 @@ namespace SecondScreen
     }
 }
 
-namespace SecondScreen
+namespace Microsoft
 {
     namespace IndirectDisp
     {
@@ -60,10 +60,10 @@ namespace SecondScreen
             HRESULT Init();
 
             LUID AdapterLuid;
-            SecondScreen::WRL::ComPtr<IDXGIFactory5> DxgiFactory;
-            SecondScreen::WRL::ComPtr<IDXGIAdapter1> Adapter;
-            SecondScreen::WRL::ComPtr<ID3D11Device> Device;
-            SecondScreen::WRL::ComPtr<ID3D11DeviceContext> DeviceContext;
+            Microsoft::WRL::ComPtr<IDXGIFactory5> DxgiFactory;
+            Microsoft::WRL::ComPtr<IDXGIAdapter1> Adapter;
+            Microsoft::WRL::ComPtr<ID3D11Device> Device;
+            Microsoft::WRL::ComPtr<ID3D11DeviceContext> DeviceContext;
         };
 
         /// <summary>
@@ -84,8 +84,8 @@ namespace SecondScreen
             IDDCX_SWAPCHAIN m_hSwapChain;
             std::shared_ptr<Direct3DDevice> m_Device;
             HANDLE m_hAvailableBufferEvent;
-            SecondScreen::WRL::Wrappers::Thread m_hThread;
-            SecondScreen::WRL::Wrappers::Event m_hTerminateEvent;
+            Microsoft::WRL::Wrappers::Thread m_hThread;
+            Microsoft::WRL::Wrappers::Event m_hTerminateEvent;
         };
 
         /// <summary>
