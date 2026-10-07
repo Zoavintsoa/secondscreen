@@ -135,6 +135,14 @@ void ControlServer::clientLoop(SOCKET client) {
         const auto action = session.onMessage(message);
         if (!sendAction(action)) break;
 
+        if (message.type == second_screen::control::MessageType::Hello && action.accepted) {
+            const auto challenge = pairing_.createChallenge(session.identity().deviceId);
+            if (!challenge.code.empty()) {
+                std::cout << "[SecondScreen] Pairing code for " << session.identity().deviceId
+                          << ": " << challenge.code << " (valid 120s)" << std::endl;
+            }
+        }
+
         if (action.authenticated && !authenticated) {
             authenticated = true;
             if (authCallback_) authCallback_(true);
