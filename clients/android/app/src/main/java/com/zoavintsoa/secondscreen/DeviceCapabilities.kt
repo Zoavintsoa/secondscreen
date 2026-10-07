@@ -13,7 +13,12 @@ data class DeviceCapabilities(
 ) { fun bestBaseline()=codecs.firstOrNull{it.codec==1} ?: codecs.firstOrNull() }
 
 object DeviceCapabilitiesProbe {
-    fun probe(context:Context):DeviceCapabilities {
+    fun helloJson(c:DeviceCapabilities):String {
+        val codecs=c.codecs.joinToString(","){ x -> "{\"codec\":"+x.codec+",\"maxWidth\":"+x.maxWidth+",\"maxHeight\":"+x.maxHeight+",\"maxFps\":"+x.maxFps+"}" }
+        return "{\"platform\":\"android\",\"api\":"+c.api+",\"model\":\""+escape(c.model)+"\",\"manufacturer\":\""+escape(c.manufacturer)+"\",\"touch\":"+c.touch+",\"stylus\":"+c.stylus+",\"refreshHz\":"+c.refreshHz+",\"hdr\":"+c.hdr+",\"codecs\":["+codecs+"]}"
+    }
+
+    fun probe(context:Context) {
         val pm=context.packageManager
         val display=if(Build.VERSION.SDK_INT>=30) context.getSystemService(WindowManager::class.java)?.defaultDisplay
         else @Suppress("DEPRECATION") (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.defaultDisplay
@@ -38,4 +43,6 @@ object DeviceCapabilitiesProbe {
         return DeviceCapabilities(Build.VERSION.SDK_INT,Build.MODEL?:"Android",Build.MANUFACTURER?:"unknown",
             touch,stylus,min(refresh,240f),hdr,codecs.distinctBy{Triple(it.codec,it.maxWidth,it.maxHeight)})
     }
+
+    private fun escape(v:String)=v.replace("\\","\\\\").replace("\"","\\\"")
 }
