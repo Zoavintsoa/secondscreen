@@ -112,6 +112,27 @@ The host must not accept a pairing code as a long-term password.
 
 ## Video transport
 
+QUIC datagrams have a negotiated per-datagram maximum size. MsQuic exposes that limit through `DATAGRAM_STATE_CHANGED`; the sender must never assume that a complete H.264 access unit fits in one datagram. citeturn0search1turn0search6
+
+SecondScreen therefore fragments each encoded access unit into independently authenticated QUIC datagrams. Each fragment uses the `SSVG` header defined below. Loss of any fragment invalidates that access unit; the receiver waits for a later keyframe rather than assembling a corrupt frame.
+
+Fragment header:
+
+- 4 bytes magic: SSVG
+- 1 byte fragment protocol version (1)
+- 1 byte codec (1=H264, 2=HEVC)
+- 1 byte frame flags (bit 0 = keyframe, bit 1 = config)
+- 1 byte reserved
+- 4 bytes frameId, unsigned big-endian
+- 2 bytes fragment index, unsigned big-endian
+- 2 bytes fragment count, unsigned big-endian
+- 8 bytes presentation timestamp in microseconds, unsigned big-endian
+- remaining bytes: Annex-B fragment payload
+
+The sender chooses the payload size from the currently advertised QUIC `MaxSendLength`. A frame is accepted only when all fragments with the same frameId, count, codec, flags and timestamp have arrived. The reassembly buffer is bounded and expired incomplete frames are discarded.
+
+The legacy `SSVF` access-unit envelope remains the TCP bring-up format only.
+
 Each access unit:
 
 - 4 bytes magic: SSVF
