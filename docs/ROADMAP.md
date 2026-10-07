@@ -2,21 +2,36 @@
 
 ## Phase 1 — Windows + Android vertical slice
 
+### Foundation
+
 - [x] Native repository structure
 - [x] Versioned protocol
 - [x] LAN discovery foundation
 - [x] Pairing manager foundation
 - [x] Windows host executable foundation
 - [x] Android MediaCodec rendering foundation
-- [ ] Official IddCx driver integrated and renamed
-- [ ] GPU frame bridge from IddCx swap-chain
-- [ ] Media Foundation hardware H.264 encoder
-- [ ] QUIC transport with MsQuic
+- [x] IddCx driver source foundation based on Microsoft's official sample
+- [x] Experimental GPU shared-resource frame bridge
+- [x] GPU NV12 conversion path
+- [x] Media Foundation H.264 encoder path
+- [x] TCP video bring-up path
+- [x] Separate discovery/control/video port model
+- [x] Product vision and Smart Stream architecture
+
+### Production path — not hardware accepted yet
+
+- [ ] Harden IddCx frame handoff and keep driver frame loop minimal
+- [ ] MsQuic host transport
+- [ ] MsQuic Android transport adapter
 - [ ] Authenticated pairing end-to-end
+- [ ] Control protocol implementation
+- [ ] Dynamic STREAM_CONFIG on Android
+- [ ] Keyframe request/recovery
+- [ ] Adaptive bitrate/FPS controller
 - [ ] Real virtual display -> Android video path
-- [ ] Reconnect + forced keyframe recovery
 - [ ] Touch/stylus return channel
-- [ ] Adaptive bitrate/FPS
+- [ ] End-to-end diagnostics
+- [ ] Real Windows-to-Android hardware acceptance
 
 ## Phase 2 — Windows productization
 
@@ -29,8 +44,19 @@
 - [ ] 60/120 Hz where hardware allows
 - [ ] Diagnostics/latency overlay
 - [ ] Crash recovery and service watchdog
+- [ ] Trusted-device management
+- [ ] Workspace profiles
 
-## Phase 3 — macOS + iPadOS
+## Phase 3 — Creator platform
+
+- [ ] Creator Preview
+- [ ] Creator Scopes
+- [ ] Camera Monitor
+- [ ] Tablet/stylus mode
+- [ ] DaVinci/Premiere/OBS/vMix extension interfaces
+- [ ] Local extension SDK
+
+## Phase 4 — macOS + iPadOS
 
 - [ ] Intel macOS host
 - [ ] Apple Silicon host
@@ -41,13 +67,15 @@
 - [ ] Metal renderer
 - [ ] Apple Pencil/touch input
 
-## Phase 4 — Advanced
+## Phase 5 — Advanced
 
 - [ ] Multiple simultaneous clients
 - [ ] Multiple virtual monitors
 - [ ] Audio transport
 - [ ] USB/HID extensions
+- [ ] HDR/color-management profiles
 - [ ] Network-quality adaptive profiles
+- [ ] Camera/microphone roles
 
 ### Rule
 
