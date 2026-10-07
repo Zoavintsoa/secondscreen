@@ -2,17 +2,19 @@
 
 ## Current conclusion
 
-The Windows architecture is technically sound for a true virtual display because Microsoft explicitly positions IddCx for remote-display streaming and virtual-monitor scenarios. The official IddCx sample provides the adapter, monitor and swap-chain lifecycle we need; the production work is replacing its frame-discard section with a real frame pipeline.
+The Windows architecture is technically appropriate for a real virtual-display product. Microsoft's IddCx model provides the virtual adapter, monitor and swap-chain lifecycle, and the OS supplies the desktop image as a DirectX surface.
 
-The Windows path is the primary implementation track:
+The production path remains:
 
 OS virtual monitor
 -> IddCx swap-chain
--> GPU frame bridge
--> hardware H.264 encoder
+-> minimal GPU frame handoff
+-> hardware H.264/HEVC encoder
 -> QUIC datagram
 -> Android MediaCodec Surface
 -> fullscreen presentation
+
+The repository now contains experimental implementations of several links in this chain. They are intentionally still below the real-hardware acceptance gate.
 
 ## Hard architectural rule
 
@@ -23,7 +25,7 @@ Driver responsibilities:
 - supported modes;
 - swap-chain ownership;
 - frame acquisition;
-- minimal frame handoff;
+- minimal GPU frame publication;
 - driver telemetry.
 
 Host-service responsibilities:
@@ -37,122 +39,114 @@ Host-service responsibilities:
 - user settings;
 - input routing.
 
-This isolates network failures from the Windows display path.
+Microsoft's IddSample guidance also recommends keeping significant work out of the frame-processing loop because it directly affects system performance.
 
-## Frame pipeline
+## Current frame bridge
 
-Preferred path:
+The current Windows branch contains an experimental triple-buffered shared D3D11 resource bridge between the IddCx driver process and the host service.
 
-1. IddCx supplies a GPU-backed DXGI surface.
-2. A frame bridge transfers ownership/reference to an asynchronous processing queue.
-3. A GPU-compatible color conversion produces encoder input when required.
-4. Media Foundation H.264 hardware MFT encodes the frame.
-5. The access unit is normalized to Annex-B.
-6. The host puts the access unit on the QUIC datagram path.
-7. Android decodes directly to a Surface.
-8. Presentation timestamps are used for latency accounting.
+Design:
+- BGRA shared textures;
+- keyed mutex synchronization;
+- shared state mapping;
+- ready event;
+- adapter LUID matching;
+- sequence counter to reject torn metadata snapshots.
 
-CPU readback is a fallback/debug path, not the final performance path.
+This is an engineering bridge, not yet a final production IPC contract.
 
-## Encoder strategy
+Before acceptance it must be hardened for:
+- lifecycle/reconnect;
+- ACL minimization;
+- device/driver disappearance;
+- mode changes;
+- resource recreation;
+- non-BGRA source formats;
+- frame-loop timing.
 
-H.264 is the first mandatory codec because it has broad hardware decoder support and is directly supported by Media Foundation. The encoder must:
-- prefer a hardware MFT;
-- use low-latency mode;
-- accept NV12;
-- produce H.264;
-- support forced keyframes;
-- expose encoder latency and queue depth;
-- fall back to software only when hardware encoding is unavailable.
+## Encoder
 
-The first hardware profile is 1920x1080 at 60 FPS. 720p30 is the safe fallback.
+The host contains a Media Foundation H.264 path:
+- hardware MFT preferred;
+- software fallback;
+- low-latency property when supported;
+- NV12 input;
+- GPU-side conversion;
+- Annex-B normalization;
+- sequence-header handling;
+- explicit keyframe request.
 
-## Adaptive quality controller
+The encoder is still below acceptance because MFT behavior varies by hardware/driver and must be validated on the actual target PCs.
 
-Do not adapt from FPS alone.
+Keyframe state is deliberately owned by the encoder/session. A display-frame sequence number is never treated as a keyframe indicator.
 
-Inputs:
-- encode time;
-- decode time;
-- QUIC RTT;
-- packet loss;
+## Transport
+
+The current TCP video server is a deterministic bring-up path only.
+
+Port separation:
+- UDP discovery: 49151;
+- future control: 49152;
+- temporary video TCP: 49153.
+
+Production uses MsQuic:
+- reliable stream for control;
+- datagrams for video.
+
+MsQuic support covers Windows and Linux/Android, making it suitable for a common application protocol with native platform adapters.
+
+## Android
+
+The Android client currently has:
+- discovery;
+- reconnect loop;
+- TCP bring-up receiver;
+- MediaCodec Surface rendering;
+- presentation timestamps.
+
+Still required:
+- QUIC adapter;
+- authenticated HELLO/AUTH;
+- dynamic STREAM_CONFIG;
+- keyframe recovery;
+- stale-delta rejection;
+- input channel;
+- telemetry.
+
+## Smart Stream Engine
+
+The product architecture now defines a local controller using:
+- RTT;
 - jitter;
+- loss;
+- encode/decode time;
 - queue depth;
-- thermal throttling where available;
-- rendered FPS.
+- presented FPS;
+- thermal/battery hints;
+- scene activity.
 
-Controller:
-- increase bitrate slowly when the path is healthy;
-- decrease bitrate quickly after sustained congestion;
-- reduce FPS only after bitrate reduction;
-- reduce resolution when target latency remains unattainable;
-- force a keyframe after a profile change.
-
-Use hysteresis and minimum dwell times to avoid oscillation.
-
-## Android renderer
-
-Android must not assume 1920x1080 forever.
-
-The client should:
-- receive STREAM_CONFIG;
-- create the decoder using negotiated dimensions;
-- recreate only when codec/profile changes;
-- use Surface output;
-- drop stale frames rather than blocking the render path;
-- request a keyframe after decoder reset or loss recovery.
-
-## macOS feasibility
-
-Apple's public APIs clearly support high-performance screen capture through ScreenCaptureKit and QUIC through Network.framework. ScreenCaptureKit is intended for screen streaming/mirroring and delivers CMSampleBuffer data.
-
-However, current public DriverKit documentation describes USB, HID, networking, audio and related device families; it does not expose a general-purpose third-party virtual-display driver family equivalent to Windows IddCx.
-
-Therefore SecondScreen must not pretend that ScreenCaptureKit creates a virtual monitor.
-
-macOS track:
-1. native host app;
-2. supported Apple screen-capture APIs;
-3. VideoToolbox encoding;
-4. Network.framework QUIC;
-5. investigate only supported/public mechanisms for a true virtual display;
-6. if a supported virtual-display mechanism is unavailable, keep macOS host in capture/stream mode until a legitimate display-driver path exists.
-
-No private API, undocumented display hack or fragile kernel extension.
-
-## iPadOS
-
-iPadOS client:
-- native Swift/SwiftUI shell;
-- Network.framework QUIC;
-- hardware H.264/HEVC decode;
-- Metal presentation;
-- touch and Apple Pencil input;
-- persistent pairing;
-- reconnect/keyframe recovery.
-
-The same protocol is used across Windows, macOS, Android and iPadOS.
+The controller must degrade quickly and recover slowly, with hysteresis and minimum dwell times.
 
 ## Product differentiation
 
-The product should not compete only on "it shows a second screen".
+SecondScreen is designed as a virtual-display core plus workspace roles:
+- Creator Preview;
+- Creator Scopes;
+- Camera Monitor;
+- Tablet Input;
+- Gaming Low Latency.
 
-Differentiators:
-- native virtual monitor;
-- low-latency LAN operation;
-- no cloud account;
-- hardware acceleration;
-- automatic quality control;
-- one-tap reconnect;
-- persistent trusted-device pairing;
-- touch/stylus input;
-- transparent latency diagnostics;
-- cross-platform protocol;
-- creator-oriented presets for DaVinci Resolve, Premiere Pro and live-production workflows.
+This creates a product surface beyond generic screen mirroring without destabilizing the display driver.
+
+## macOS
+
+ScreenCaptureKit and VideoToolbox are appropriate for capture/encoding workflows, but they must not be described as creating a third-party virtual monitor.
+
+The macOS track must use only supported/public APIs. If a legitimate virtual-display mechanism is unavailable, the product should retain a capture/stream mode rather than using private APIs.
 
 ## Quality gates
 
-A feature is accepted only after real-hardware validation.
+A feature is accepted only after real-hardware validation:
 
 1. Windows sees a real SecondScreen monitor.
 2. Host receives real IddCx frames.
@@ -163,26 +157,17 @@ A feature is accepted only after real-hardware validation.
 7. Adaptive quality maintains usable latency.
 8. Installer/uninstaller and driver recovery are reliable.
 
-No simulator checkbox can satisfy these gates.
+No simulator checkbox satisfies these gates.
 
-## Current state
+## Next implementation order
 
-Implemented foundation:
-- native repository structure;
-- protocol v1.1;
-- Windows IddCx driver source foundation based on Microsoft's official sample;
-- Windows host skeleton;
-- secure pairing foundation;
-- UDP discovery bring-up;
-- Android MediaCodec renderer foundation;
-- CI build definitions;
-- macOS/iPadOS architecture.
-
-Still required for the first real product:
-- connect IddCx frames to the host frame pipeline;
-- real Media Foundation H.264 encoding;
-- production QUIC;
-- authenticated end-to-end handshake;
-- dynamic Android stream configuration;
-- keyframe recovery;
-- real Windows-to-Android hardware acceptance.
+1. MsQuic transport abstraction.
+2. End-to-end control/auth protocol.
+3. Android dynamic stream configuration and keyframe recovery.
+4. Harden the GPU frame bridge.
+5. Smart Stream Engine implementation.
+6. Input channel.
+7. Diagnostics.
+8. Workspace profiles.
+9. Windows productization.
+10. macOS/iPadOS native tracks.
