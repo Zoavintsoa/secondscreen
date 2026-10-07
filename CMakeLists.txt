@@ -18,8 +18,9 @@ enable_testing()
 if(WIN32)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN _UNICODE UNICODE)
 
-    # Windows SecondScreen Native Host Executable
-    add_executable(SecondScreenHost
+    # Legacy Windows prototype (not the shipped native host). The canonical host is
+    # native/windows-host/SecondScreenHost and is built by build-native.yml.
+    add_executable(SecondScreenLegacyHost
         native/windows/main.cpp
         native/windows/host/HostEngine.cpp
         native/windows/capture/DXGICapture.cpp
@@ -30,24 +31,24 @@ if(WIN32)
         native/windows/network/NetworkServer.cpp
     )
 
-    target_link_libraries(SecondScreenHost PRIVATE
+    target_link_libraries(SecondScreenLegacyHost PRIVATE
         d3d11
         dxgi
         dxguid
         ws2_32
     )
 
-    target_include_directories(SecondScreenHost PRIVATE
+    target_include_directories(SecondScreenLegacyHost PRIVATE
         native/windows
         native/windows/vendor/nvidia
         core/protocol
     )
 
-    add_executable(SecondScreenDriverInstaller
+    add_executable(SecondScreenLegacyDriverInstaller
         native/windows/driver-installer/DriverInstaller.cpp
     )
 
-    target_link_libraries(SecondScreenDriverInstaller PRIVATE
+    target_link_libraries(SecondScreenLegacyDriverInstaller PRIVATE
         setupapi
         newdev
     )
