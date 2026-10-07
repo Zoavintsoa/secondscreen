@@ -51,7 +51,7 @@ private struct ContentView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            Color.black.edgesIgnoringSafeArea(.all)
             VStack(spacing:16) {
                 Text("SecondScreen — Zoavintsoa")
                     .foregroundColor(.white)
@@ -142,7 +142,6 @@ private struct LegalSheet: View {
         NavigationView {
             bodyView
                 .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
         }
     }
 }
