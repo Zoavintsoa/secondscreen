@@ -157,6 +157,17 @@ bool H264Encoder::configureEncoder() {
 bool H264Encoder::encode(ID3D11Texture2D* d3dTexture, const FrameInfo& info, EncodedAccessUnit& output) {
     if (!started_ || !d3dTexture) return false;
 
+    if (!d3dConfigured_) {
+        if (FAILED(d3dTexture->GetDevice(&d3dDevice_)) || !d3dDevice_) return false;
+        if (!converter_.initialize(d3dDevice_.Get(), width_, height_)) return false;
+        if (FAILED(dxgiManager_->ResetDevice(d3dDevice_.Get(), dxgiManagerResetToken_))) return false;
+        transform_->ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, reinterpret_cast<ULONG_PTR>(dxgiManager_.Get()));
+        d3dConfigured_ = true;
+    }
+
+    Microsoft::WRL::ComPtr<ID3D11Texture2D> nv12Texture;
+    if (!converter_.convert(d3dTexture, &nv12Texture)) return false;
+
     if (forceKeyFrame_) {
         if (codecApi_) setCodecProperty(CODECAPI_AVEncVideoForceKeyFrame, VARIANT_TRUE);
         forceKeyFrame_ = false;
@@ -212,7 +223,9 @@ bool H264Encoder::drainOutput(EncodedAccessUnit& output, bool& produced) {
     if (FAILED(hr)) return false;
 
     output.annexB.clear();
-    output.timestampUs = static_cast<uint64_t>(outSample->GetSampleTime(&reinterpret_cast<LONGLONG&>(output.timestampUs)) == S_OK ? output.timestampUs / 10 : 0);
+    LONGLONG sampleTime = 0;
+    output.timestampUs = SUCCEEDED(outSample->GetSampleTime(&sampleTime))
+        ? static_cast<uint64_t>(sampleTime / 10) : 0;
 
     UINT32 clean = 0;
     output.keyFrame = SUCCEEDED(outSample->GetUINT32(MFSampleExtension_CleanPoint, &clean)) && clean != 0;
@@ -275,6 +288,9 @@ void H264Encoder::shutdown() {
     inputType_.Reset();
     outputType_.Reset();
     codecApi_.Reset();
+    converter_.shutdown();
+    d3dDevice_.Reset();
+    d3dConfigured_ = false;
     dxgiManager_.Reset();
     sequenceHeader_.clear();
     if (started_) MFShutdown();
