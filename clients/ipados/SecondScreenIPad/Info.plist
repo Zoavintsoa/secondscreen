@@ -4,6 +4,8 @@
 <key>CFBundleDisplayName</key><string>SecondScreen</string>
 <key>CFBundleIdentifier</key><string>com.zoavintsoa.secondscreen.ipad</string>
 <key>CFBundleName</key><string>SecondScreen</string>
+<key>CFBundleGetInfoString</key><string>SecondScreen — Zoavintsoa</string>
+<key>NSHumanReadableCopyright</key><string>Copyright © 2026 Zoavintsoa</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>0.1.0</string>
 <key>CFBundleVersion</key><string>1</string>
