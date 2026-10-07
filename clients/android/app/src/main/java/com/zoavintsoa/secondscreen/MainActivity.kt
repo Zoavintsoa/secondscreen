@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.text.InputType
 import android.view.WindowManager
 import android.widget.EditText
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
         getPreferences(Context.MODE_PRIVATE).getBoolean("legal_accepted_v1", false)
 
     private fun initializeClient() {
+        if (client != null) return
         val surface = findViewById<android.view.SurfaceView>(R.id.videoSurface)
         client = SecondScreenClient(
             this,
@@ -51,9 +53,10 @@ class MainActivity : ComponentActivity() {
         AlertDialog.Builder(this)
             .setTitle("SecondScreen — Zoavintsoa")
             .setMessage(
-                "Avant d’utiliser SecondScreen, veuillez accepter les Conditions d’utilisation et la Politique de confidentialité. " +
-                    "SecondScreen privilégie les connexions locales et demande uniquement les permissions nécessaires aux fonctions activées."
+                "Avant d’utiliser SecondScreen, veuillez consulter et accepter les Conditions d’utilisation et la Politique de confidentialité. " +
+                    "Le fonctionnement normal est local/LAN et aucune création de compte n’est requise."
             )
+            .setNeutralButton("Conditions") { _, _ -> showLegalDocument("Conditions d’utilisation", TERMS) }
             .setNegativeButton("Quitter") { _, _ -> finish() }
             .setPositiveButton("J’accepte") { _, _ ->
                 getPreferences(Context.MODE_PRIVATE)
@@ -70,12 +73,34 @@ class MainActivity : ComponentActivity() {
         AlertDialog.Builder(this)
             .setTitle("À propos de SecondScreen")
             .setMessage(
-                "SecondScreen\n\n" +
+                "SecondScreen — Zoavintsoa\n\n" +
                     "Your devices become your workspace.\n\n" +
                     "Créé et développé par Zoavintsoa.\n" +
-                    "Native • Cross-platform • Local-first\n\n" +
-                    "Android • Windows • macOS • iPadOS"
+                    "Native • Cross-platform • Local-first\n" +
+                    "Android • Windows • macOS • iPadOS\n\n" +
+                    "Version 0.1.0"
             )
+            .setNeutralButton("Confidentialité") { _, _ ->
+                showLegalDocument("Politique de confidentialité", PRIVACY)
+            }
+            .setNegativeButton("Conditions") { _, _ ->
+                showLegalDocument("Conditions d’utilisation", TERMS)
+            }
+            .setPositiveButton("Fermer", null)
+            .show()
+    }
+
+    private fun showLegalDocument(title: String, body: String) {
+        val textView = TextView(this).apply {
+            text = body
+            textSize = 14f
+            setPadding(32, 24, 32, 24)
+            setTextIsSelectable(true)
+        }
+        val scroll = ScrollView(this).apply { addView(textView) }
+        AlertDialog.Builder(this)
+            .setTitle(title)
+            .setView(scroll)
             .setPositiveButton("Fermer", null)
             .show()
     }
@@ -102,12 +127,64 @@ class MainActivity : ComponentActivity() {
                 .show()
         }
         latch.await()
-        return result?.takeIf { it.length == 6 }
+        return result?.takeIf { it.length == 6 && it.all(Char::isDigit) }
     }
 
     override fun onDestroy() {
         client?.close()
         client = null
         super.onDestroy()
+    }
+
+    private companion object {
+        const val TERMS = """
+SecondScreen — Conditions d’utilisation
+
+1. Objet
+SecondScreen est un logiciel de deuxième écran et d’espace de travail local développé par Zoavintsoa.
+
+2. Utilisation
+Vous êtes responsable de l’utilisation du logiciel, des appareils connectés et des contenus affichés ou transmis. Utilisez uniquement des appareils et réseaux pour lesquels vous disposez des autorisations nécessaires.
+
+3. Réseau et appairage
+SecondScreen privilégie les connexions locales. L’appairage repose sur une confirmation utilisateur et un identifiant de session. Ne communiquez pas un code d’appairage à une personne non autorisée.
+
+4. Disponibilité
+Le produit est en développement. Certaines fonctions peuvent être expérimentales, indisponibles selon l’OS ou le matériel, ou nécessiter une validation physique.
+
+5. Responsabilité
+Dans les limites permises par la loi applicable, le logiciel est fourni sans garantie de disponibilité, de compatibilité universelle ou d’absence d’erreur pendant cette phase de développement.
+
+6. Propriété
+SecondScreen — Zoavintsoa et les éléments originaux du projet restent soumis à leurs droits et licences applicables. Les composants tiers conservent leurs propres licences et notices.
+
+7. Acceptation
+L’utilisation de l’application après acceptation signifie que vous avez pris connaissance de ces conditions.
+"""
+
+        const val PRIVACY = """
+SecondScreen — Politique de confidentialité
+
+1. Principe
+SecondScreen est conçu selon une approche local-first. Le fonctionnement normal ne nécessite pas de compte ni de service cloud.
+
+2. Données locales
+L’application peut conserver localement des informations nécessaires au fonctionnement, notamment un identifiant d’appareil et un jeton de session d’appairage.
+
+3. Réseau
+Les données de deuxième écran sont destinées au réseau local entre l’hôte et le client. SecondScreen ne vend pas les données utilisateur et n’ajoute pas de publicité ou d’analytique cachée dans le produit.
+
+4. Caméra et microphone
+Ces capteurs ne doivent être utilisés que lorsqu’une fonction correspondante est explicitement activée et après autorisation du système.
+
+5. Permissions
+Les permissions Android sont demandées uniquement lorsqu’une fonction les nécessite. Vous pouvez les gérer dans les réglages du système.
+
+6. Conservation
+Les données locales restent sur l’appareil jusqu’à leur suppression ou leur remplacement par l’application ou l’utilisateur.
+
+7. Évolutions
+Cette politique peut être mise à jour lorsque de nouvelles fonctions sont ajoutées. La version complète du projet est disponible dans PRIVACY.md.
+"""
     }
 }
