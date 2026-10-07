@@ -4,36 +4,27 @@
     <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
     <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
   </ItemGroup>
-
   <PropertyGroup Label="Globals">
     <ProjectGuid>{6E0B8B9E-EDB4-4B0E-8D4B-2C9D2F1D2F01}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
     <RootNamespace>SecondScreenHost</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
-
   <Import Project="$(VCTargetsPath)Microsoft.Cpp.Default.props" />
-
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <ConfigurationType>Application</ConfigurationType><UseDebugLibraries>true</UseDebugLibraries><PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
-    <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <ConfigurationType>Application</ConfigurationType><UseDebugLibraries>false</UseDebugLibraries><PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
-
   <Import Project="$(VCTargetsPath)Microsoft.Cpp.props" />
-
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="host\HostServer.cpp" />
     <ClCompile Include="host\FrameBridge.cpp" />
     <ClCompile Include="host\GpuVideoConverter.cpp" />
     <ClCompile Include="host\H264Encoder.cpp" />
-    <ClCompile Include="host\LanProtocol.cpp" />
+    <ClCompile Include="host\ControlServer.cpp" />
     <ClCompile Include="host\DiscoveryService.cpp" />
     <ClCompile Include="host\PairingManager.cpp" />
     <ClCompile Include="host\VideoStreamServer.cpp" />
@@ -42,13 +33,12 @@
     <ClCompile Include="..\..\shared-protocol\VIDEO_FRAGMENT.cpp" />
     <ClCompile Include="..\..\shared-protocol\CONTROL_SESSION.cpp" />
   </ItemGroup>
-
   <ItemGroup>
     <ClInclude Include="host\HostServer.h" />
     <ClInclude Include="host\FrameBridge.h" />
     <ClInclude Include="host\GpuVideoConverter.h" />
     <ClInclude Include="host\H264Encoder.h" />
-    <ClInclude Include="host\LanProtocol.h" />
+    <ClInclude Include="host\ControlServer.h" />
     <ClInclude Include="host\DiscoveryService.h" />
     <ClInclude Include="host\PairingManager.h" />
     <ClInclude Include="host\VideoStreamServer.h" />
@@ -57,12 +47,10 @@
     <ClInclude Include="..\..\shared-protocol\VIDEO_FRAGMENT.h" />
     <ClInclude Include="..\..\shared-protocol\CONTROL_SESSION.h" />
   </ItemGroup>
-
   <PropertyGroup>
     <OutDir>$(SolutionDir)build\$(Configuration)\</OutDir>
     <IntDir>$(SolutionDir)buildobj\$(Configuration)\</IntDir>
   </PropertyGroup>
-
   <ItemDefinitionGroup>
     <ClCompile>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -75,6 +63,5 @@
       <AdditionalDependencies>Ws2_32.lib;Mfplat.lib;Mf.lib;Mfuuid.lib;Shlwapi.lib;Bcrypt.lib;D3D11.lib;DXGI.lib;Ole32.lib;Advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-
-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Import Project="$(VCTargetsPath)Microsoft.Cpp.targets" />
 </Project>
