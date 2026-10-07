@@ -204,3 +204,7 @@ Not tested in this pass:
 - QUIC connectivity.
 
 Those remain for the planned real-hardware validation.
+
+
+### 2026-10-08 control/Apple pass
+The Windows host now wires ControlSession to PairingManager and gates the TCP video bring-up path on successful authentication. Android stores the issued session credential and exposes a six-digit pairing-code dialog. Native macOS and iPadOS Xcode targets are present and CI invokes xcodebuild for both. These are code/CI milestones only; no physical device acceptance has been performed.
