@@ -101,8 +101,8 @@ Recommended authentication exchange:
 
 1. client sends HELLO with persistent deviceId;
 2. host sends pairing challenge when the device is unknown;
-3. user confirms the six-digit code;
-4. host issues a random session credential;
+3. client sends the six-digit code in PAIR_REQUEST; the host verifies it against the pending challenge and local user confirmation flow;
+4. host issues a random session credential and returns it over the encrypted QUIC channel;
 5. client stores the credential locally;
 6. reconnect uses AUTH over QUIC;
 7. host rejects unknown/revoked credentials;
