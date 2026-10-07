@@ -2,8 +2,8 @@
 #include "../../../shared-protocol/VIDEO_FRAGMENT.h"
 #include <cstdlib>
 #include <iostream>
-#include <windows.h>
 #include <winsock2.h>
+#include <windows.h>
 
 namespace second_screen {
 namespace {
