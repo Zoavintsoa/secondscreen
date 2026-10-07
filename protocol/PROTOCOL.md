@@ -32,8 +32,12 @@ Message types:
 - 0x08 CLOSE
 - 0x09 INPUT
 
-## Video framing
-The initial implementation uses a reliable TCP video channel to simplify bring-up. The wire format is deliberately transport-independent so it can move to QUIC/UDP later.
+## Video transport
+The production transport is QUIC using Microsoft's MsQuic stack. Control uses a reliable bidirectional QUIC stream. Video access units use QUIC datagrams so stale frames can be discarded instead of creating TCP head-of-line blocking. A reliable keyframe request/configuration stream remains available alongside the datagrams.
+
+For the first bring-up, the same framing is also accepted over TCP. This keeps hardware bring-up deterministic while the production transport is integrated.
+
+MsQuic is cross-platform and supports Windows, Linux/Android and macOS; it provides encrypted QUIC 1.3 transport, reliable streams and unreliable datagrams.
 
 Each access unit:
 - 4 bytes magic: `SSVF`
