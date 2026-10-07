@@ -8,9 +8,9 @@
 
 #include "DiscoveryService.h"
 #include "PairingManager.h"
+#include "ControlServer.h"
 #include "FrameBridge.h"
 #include "H264Encoder.h"
-#include "LanProtocol.h"
 #include "VideoStreamServer.h"
 #include "DriverFrameReceiver.h"
 
@@ -20,18 +20,19 @@ class HostServer {
 public:
     HostServer();
     ~HostServer();
-
     bool start();
     void stop();
     bool submitFrame(ID3D11Texture2D* texture, const FrameInfo& info);
 
 private:
     void onFrame(ID3D11Texture2D* texture, const FrameInfo& info);
+    void onClientAuth(bool authenticated);
+    void requestKeyframe();
 
     std::atomic_bool running_{false};
-    std::unique_ptr<std::thread> discoveryThread_;
-    std::unique_ptr<std::thread> controlThread_;
     DiscoveryService discovery_;
+    PairingManager pairing_;
+    std::unique_ptr<ControlServer> controlServer_;
     FrameBridge frameBridge_;
     H264Encoder encoder_;
     VideoStreamServer videoStream_;
