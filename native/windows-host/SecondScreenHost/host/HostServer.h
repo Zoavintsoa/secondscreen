@@ -12,6 +12,7 @@
 #include "H264Encoder.h"
 #include "LanProtocol.h"
 #include "VideoStreamServer.h"
+#include "DriverFrameReceiver.h"
 
 namespace second_screen {
 
@@ -34,6 +35,7 @@ private:
     FrameBridge frameBridge_;
     H264Encoder encoder_;
     VideoStreamServer videoStream_;
+    DriverFrameReceiver frameReceiver_;
     std::mutex pipelineMutex_;
     uint32_t encoderWidth_{};
     uint32_t encoderHeight_{};
