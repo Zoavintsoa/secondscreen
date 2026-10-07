@@ -384,6 +384,12 @@ void SwapChainProcessor::RunCore()
         return;
     }
 
+    // On supported Windows 11 systems, request realtime GPU scheduling for
+    // this swap-chain. Older systems may return E_NOTIMPL; that is harmless.
+    IDARG_IN_SETREALTIMEGPUPRIORITY priorityArgs{};
+    priorityArgs.pDevice = DxgiDevice.Get();
+    IddCxSetRealtimeGPUPriority(m_hSwapChain, &priorityArgs);
+
     // Acquire and release buffers in a loop
     for (;;)
     {
