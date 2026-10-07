@@ -429,9 +429,15 @@ void SwapChainProcessor::RunCore()
             if (SUCCEEDED(AcquiredBuffer.As(&sourceTexture))) {
                 D3D11_TEXTURE2D_DESC sourceDesc{};
                 sourceTexture->GetDesc(&sourceDesc);
-                if (!m_FramePublisherInitialized) {
+                if (!m_FramePublisherInitialized ||
+                    m_FramePublisherWidth != sourceDesc.Width ||
+                    m_FramePublisherHeight != sourceDesc.Height) {
                     m_FramePublisherInitialized =
                         m_FramePublisher.initialize(m_Device->Device.Get(), sourceDesc.Width, sourceDesc.Height);
+                    if (m_FramePublisherInitialized) {
+                        m_FramePublisherWidth = sourceDesc.Width;
+                        m_FramePublisherHeight = sourceDesc.Height;
+                    }
                 }
                 if (m_FramePublisherInitialized) {
                     LARGE_INTEGER frequency{};
