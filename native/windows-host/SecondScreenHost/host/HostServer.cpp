@@ -45,6 +45,38 @@ bool HostServer::start() {
         controlServer_->stop(); controlServer_.reset(); discovery_.stop(); WSACleanup(); running_=false; return false;
     }
 
+    const std::string thumbprint = readQuicCertificateThumbprint();
+    if (!thumbprint.empty()) {
+        quic::TransportCallbacks callbacks;
+        callbacks.onAuthenticated = [this](bool authenticated) { onQuicAuth(authenticated); };
+        callbacks.onKeyframeRequested = [this]() { requestKeyframe(); };
+        callbacks.createPairingChallenge = [this](const std::string& deviceId) {
+            return pairing_.createChallenge(deviceId).code;
+        };
+        callbacks.onPairingChallenge = [](const std::string& deviceId, const std::string& code) {
+            std::cout << "[SecondScreen] QUIC pairing code for " << deviceId
+                      << ": " << code << " (valid 120s)" << std::endl;
+        };
+        callbacks.validateSessionToken = [this](const std::string& deviceId, const std::string& token) {
+            return pairing_.validateSessionToken(deviceId, token);
+        };
+        callbacks.confirmPairingCode = [this](const std::string& deviceId, const std::string& code) {
+            return pairing_.confirm(deviceId, code);
+        };
+        callbacks.issueSessionToken = [this](const std::string& deviceId) {
+            return pairing_.issueSessionToken(deviceId);
+        };
+
+        quicServer_ = std::make_unique<MsQuicServer>(
+            MsQuicServer::Config{kControlPort, thumbprint},
+            std::move(callbacks));
+
+        if (!quicServer_->start()) {
+            std::cerr << "[SecondScreen] MsQuic start failed; TCP bring-up remains available.\n";
+            quicServer_.reset();
+        }
+    }
+
     if (!frameBridge_.start([this](ID3D11Texture2D* texture, const FrameInfo& info){ onFrame(texture, info); })) {
         videoStream_.stop(); controlServer_->stop(); controlServer_.reset(); discovery_.stop(); WSACleanup(); running_=false; return false;
     }
