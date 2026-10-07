@@ -22,8 +22,12 @@ public:
     bool connected() const override;
     quic::DatagramLimits datagramLimits() const override;
 
-private:
+public:
+    // Public only so the callback translation unit can legally name the
+    // private implementation type; callers still interact through IQuicTransport.
     struct Impl;
+
+private:
     std::unique_ptr<Impl> impl_;
 };
 
