@@ -1,43 +1,62 @@
 # SecondScreen
 
-SecondScreen is a native, cross-platform alternative to spacedesk: a computer host creates a virtual secondary display and streams that display over the local network to an Android tablet, iPad, or another supported client.
+SecondScreen is a native, cross-platform virtual-display and local workspace platform.
 
-## Product goal
+A computer creates a real secondary display and streams it over the local network to an Android device, iPad, or another supported client.
 
-**Host computer → virtual display → low-latency LAN stream → client device**
+## Product idea
 
-The web UI that existed in this repository was only an engineering prototype. It is not the product and must not be treated as the finished application.
+**Your devices become your workspace.**
+
+The core remains a real operating-system virtual display. Above that core, SecondScreen adds adaptive streaming, trusted pairing, touch/stylus input and workflow roles for creators, camera monitoring and low-latency use.
+
+This repository is not a web page. The old web prototype is not the product.
 
 ## Native architecture
 
 ### Windows host
 - Windows Indirect Display Driver (IddCx)
-- DXGI desktop capture
-- hardware H.264/HEVC encoding
-- TCP/UDP or QUIC transport
+- GPU-backed frame bridge
+- Media Foundation hardware H.264/HEVC encoding
+- MsQuic production transport
+- TCP bring-up path only
 - pairing/authentication
-- display mode and resolution management
+- Smart Stream Engine
+- display mode and profile management
 
 ### macOS host
 - supported/public virtual-display path under investigation
-- ScreenCaptureKit for capture/streaming
+- ScreenCaptureKit for supported capture/streaming workflows
 - VideoToolbox hardware encoding
-- LAN transport
-- Screen Recording/TCC permissions
+- native QUIC transport
+- no undocumented/private display API
 
 ### Android client
 - Kotlin
 - MediaCodec hardware decoder
-- SurfaceView/TextureView renderer
+- Surface rendering
 - fullscreen and rotation
 - touch/stylus input channel
-- automatic host discovery and pairing
+- automatic discovery and pairing
+- diagnostics
 
 ### iPadOS client
 - Swift
 - VideoToolbox
 - Metal rendering
 - touch/Pencil input
+
+## Product roles
+
+Initial architecture supports:
+- normal second display;
+- Creator Preview;
+- Creator Scopes;
+- Camera Monitor;
+- Tablet/pen input;
+- Gaming Low Latency.
+
+These roles are layered above the core display and transport path.
 
 ## Engineering rules
 
@@ -48,31 +67,29 @@ The web UI that existed in this repository was only an engineering prototype. It
 5. Never commit API keys, tokens, certificates or private credentials.
 6. Prefer hardware decoding/encoding when available.
 7. Keep protocol and transport versioned so Windows/macOS hosts can interoperate with Android/iPadOS clients.
+8. Keep the IddCx processing loop minimal; network and heavy encoding work belongs outside the driver.
+9. TCP is bring-up only; production video uses QUIC datagrams.
 
-## Target repository structure
+## Current engineering state
 
-```
-native/
-  windows-host/
-  macos-host/
-clients/
-  android/
-  ipados/
-protocol/
-docs/
-tests/
-```
+The repository now contains the major native foundations:
+- IddCx driver source foundation;
+- experimental GPU shared-resource frame bridge;
+- GPU NV12 conversion;
+- Media Foundation H.264 encoder path;
+- Android MediaCodec renderer;
+- TCP bring-up stream;
+- protocol/discovery foundation;
+- product and adaptive-stream architecture.
 
-## Current state
-
-The repository is being migrated from the original React engineering prototype toward the actual native SecondScreen application. Existing protocol/reference code may be reused when technically sound, but native implementation is the acceptance target.
+These are engineering milestones, not hardware acceptance claims.
 
 ## Definition of exploitable
 
-A release is exploitable only when at least one complete path works:
+A release is exploitable only when at least one complete path works on real hardware:
 
-**Windows PC → Android device**
+**Windows PC -> Android device**
 
-with a real virtual display, real LAN transport, hardware/software decode, stable rendering, configurable resolution/FPS, pairing/security, and recovery from disconnect/reconnect.
+with a real virtual display, production LAN transport, hardware/software decode, stable rendering, configurable resolution/FPS, authenticated pairing, reconnect/keyframe recovery and acceptable latency.
 
-The next milestone is therefore the Windows Host + Android Client vertical slice. macOS is being researched in parallel, but no undocumented/private display API will be used.
+macOS and iPadOS remain separate tracks and will use only supported/public platform APIs.
