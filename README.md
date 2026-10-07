@@ -19,8 +19,8 @@ The web UI that existed in this repository was only an engineering prototype. It
 - display mode and resolution management
 
 ### macOS host
-- virtual display implementation
-- ScreenCaptureKit
+- supported/public virtual-display path under investigation
+- ScreenCaptureKit for capture/streaming
 - VideoToolbox hardware encoding
 - LAN transport
 - Screen Recording/TCC permissions
@@ -75,4 +75,4 @@ A release is exploitable only when at least one complete path works:
 
 with a real virtual display, real LAN transport, hardware/software decode, stable rendering, configurable resolution/FPS, pairing/security, and recovery from disconnect/reconnect.
 
-The next milestone is therefore the Windows Host + Android Client vertical slice.
+The next milestone is therefore the Windows Host + Android Client vertical slice. macOS is being researched in parallel, but no undocumented/private display API will be used.
