@@ -13,6 +13,7 @@
 #include "H264Encoder.h"
 #include "VideoStreamServer.h"
 #include "DriverFrameReceiver.h"
+#include "MsQuicServer.h"
 
 namespace second_screen {
 
@@ -28,6 +29,7 @@ private:
     void onFrame(ID3D11Texture2D* texture, const FrameInfo& info);
     void onClientAuth(bool authenticated);
     void requestKeyframe();
+    void onQuicAuth(bool authenticated);
 
     std::atomic_bool running_{false};
     DiscoveryService discovery_;
@@ -37,6 +39,9 @@ private:
     H264Encoder encoder_;
     VideoStreamServer videoStream_;
     DriverFrameReceiver frameReceiver_;
+    std::unique_ptr<MsQuicServer> quicServer_;
+    bool quicAuthenticated_{false};
+    uint32_t quicFrameId_{0};
     std::mutex pipelineMutex_;
     uint32_t encoderWidth_{};
     uint32_t encoderHeight_{};
