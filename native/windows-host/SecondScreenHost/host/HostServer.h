@@ -22,9 +22,6 @@ public:
 
     bool start();
     void stop();
-
-    // Called by the IddCx frame-ingress layer after it has acquired a GPU frame.
-    // The texture remains GPU-backed through conversion and encoding.
     bool submitFrame(ID3D11Texture2D* texture, const FrameInfo& info);
 
 private:
@@ -33,13 +30,11 @@ private:
     std::atomic_bool running_{false};
     std::unique_ptr<std::thread> discoveryThread_;
     std::unique_ptr<std::thread> controlThread_;
-
     DiscoveryService discovery_;
     FrameBridge frameBridge_;
     H264Encoder encoder_;
     VideoStreamServer videoStream_;
     std::mutex pipelineMutex_;
-
     uint32_t encoderWidth_{};
     uint32_t encoderHeight_{};
     uint32_t encoderFps_{};
