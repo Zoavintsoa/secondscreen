@@ -10,23 +10,23 @@ VideoToolboxEncoder::~VideoToolboxEncoder() { stop(); }
 
 EncoderCapabilities VideoToolboxEncoder::probe() {
     EncoderCapabilities caps;
-    caps.h264 = true;
-    caps.hevc = false;
 
-    CFDictionaryRef properties = nullptr;
-    if (VTCopySupportedPropertyDictionaryForEncoder(
-            1920, 1080, kCMVideoCodecType_H264, nullptr, &properties) == noErr) {
-        caps.hardwareH264 = properties != nullptr;
-        if (properties) CFRelease(properties);
-    }
+    // VideoToolbox is available on supported macOS releases, but this probe
+    // must not infer "hardware" merely from a property dictionary. Hardware
+    // acceptance requires a real VTCompressionSession and hardware-path test.
+    caps.h264 = true;
 
 #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101300
+    CFDictionaryRef properties = nullptr;
     if (VTCopySupportedPropertyDictionaryForEncoder(
             1920, 1080, kCMVideoCodecType_HEVC, nullptr, &properties) == noErr) {
         caps.hevc = properties != nullptr;
         if (properties) CFRelease(properties);
     }
 #endif
+
+    caps.hardwareH264 = false;
+    caps.hardwareHEVC = false;
     return caps;
 }
 
