@@ -13,6 +13,7 @@ SecondScreen is a native remote-display protocol, not a browser streaming protoc
 - A reconnect must recover on a keyframe, never on a stale delta frame.
 - Version negotiation is explicit.
 - The host is authoritative for display mode and stream configuration.
+- Workspace roles are negotiated above the core display protocol.
 
 ## Versioning
 
@@ -24,11 +25,16 @@ SecondScreen is a native remote-display protocol, not a browser streaming protoc
 
 ## Discovery
 
-The preferred advertisement is:
+Preferred service:
 
-- mDNS/Bonjour service: _secondscreen._tcp
-- UDP broadcast is a Windows/Android bring-up fallback.
-- Advertisement fields: service, hostId, name, protocolMajor, protocolMinor, controlPort, capabilities.
+- mDNS/Bonjour: _secondscreen._tcp
+- UDP broadcast is the Windows/Android bring-up fallback.
+- Advertisement fields include service, hostId, name, protocolMajor, protocolMinor, controlPort, videoPort and capabilities.
+
+Current bring-up ports:
+- UDP discovery: 49151
+- future control: 49152
+- temporary TCP video: 49153
 
 Discovery never grants access. A discovered host must still authenticate the session.
 
@@ -42,7 +48,7 @@ Production transport is QUIC:
 - stale video datagrams may be discarded instead of blocking newer frames;
 - a reliable control path remains available even when video packets are lost.
 
-The Windows implementation targets MsQuic. Apple-native implementations may use Network.framework QUIC while keeping the same application protocol. Android will use the same QUIC wire contract.
+The Windows implementation targets MsQuic. Android will use a native MsQuic adapter. Apple-native implementations may use Network.framework QUIC while keeping the same application protocol.
 
 TCP is retained only as a deterministic bring-up transport until QUIC is integrated.
 
@@ -131,6 +137,8 @@ JSON fields:
 - colorSpace
 - keyframeInterval
 - maxLatencyMs
+- profileId
+- role
 
 Initial profiles:
 
@@ -142,6 +150,19 @@ Initial profiles:
 | Ultra | 3840x2160 | 60 | 30 Mbps |
 
 These are starting profiles, not hard guarantees. The host may lower quality when encoder, thermal, Wi-Fi or packet-loss telemetry requires it.
+
+## Workspace roles
+
+Initial role identifiers:
+
+- display
+- creator_preview
+- creator_scopes
+- camera_monitor
+- tablet_input
+- gaming_low_latency
+
+A role may enable additional UI or input capabilities, but it cannot bypass core authentication or transport rules.
 
 ## Latency model
 
@@ -194,7 +215,9 @@ STATS is advisory and never blocks video. Suggested fields:
 - encode time;
 - decode time;
 - network RTT;
-- jitter.
+- jitter;
+- profileId;
+- recoveryCount.
 
 ## Security boundaries
 
