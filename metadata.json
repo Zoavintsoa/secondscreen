@@ -1,6 +1,12 @@
 {
   "name": "SecondScreen",
-  "description": "Système professionnel de deuxième écran virtuel multiplateforme (Windows/macOS -> Android/iOS) avec capture GPU, protocole basse latence, gestion Display 2 réel et mode DaVinci Resolve.",
+  "publisher": "Zoavintsoa",
+  "description": "Système natif de deuxième écran virtuel multiplateforme et espace de travail local (Windows/macOS -> Android/iPadOS), avec transport LAN sécurisé, capture GPU et modes créateur.",
   "requestFramePermissions": ["camera", "microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "LOCAL_LAN_VIRTUAL_DISPLAY",
+    "LOW_LATENCY_STREAMING",
+    "TOUCH_STYLUS_INPUT",
+    "CREATOR_WORKSPACE_MODES"
+  ]
 }
