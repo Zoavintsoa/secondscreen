@@ -91,6 +91,11 @@ void HostServer::stop() {
     if (!running_.exchange(false)) return;
     frameReceiver_.stop();
     frameBridge_.stop();
+    if (quicServer_) {
+        quicServer_->stop();
+        quicServer_.reset();
+    }
+    quicAuthenticated_ = false;
     encoder_.shutdown();
     videoStream_.stop();
     if (controlServer_) { controlServer_->stop(); controlServer_.reset(); }
@@ -111,13 +116,29 @@ void HostServer::onClientAuth(bool authenticated) {
     }
 }
 
+void HostServer::onQuicAuth(bool authenticated) {
+    quicAuthenticated_ = authenticated;
+    if (authenticated) {
+        std::lock_guard lock(pipelineMutex_);
+        encoder_.requestKeyFrame();
+    }
+}
+
 void HostServer::requestKeyframe() {
     std::lock_guard lock(pipelineMutex_);
     encoder_.requestKeyFrame();
 }
 
 void HostServer::onFrame(ID3D11Texture2D* texture, const FrameInfo& info) {
-    if (!videoStream_.hasClient()) return;
+    const bool quicReady =
+        quicServer_ &&
+        quicServer_->connected() &&
+        quicAuthenticated_;
+    const bool tcpReady =
+        videoStream_.hasClient() &&
+        videoStream_.isAuthorized();
+
+    if (!quicReady && !tcpReady) return;
     std::lock_guard lock(pipelineMutex_);
 
     if (encoderWidth_ != info.width || encoderHeight_ != info.height || encoderFps_ == 0) {
@@ -131,6 +152,37 @@ void HostServer::onFrame(ID3D11Texture2D* texture, const FrameInfo& info) {
 
     EncodedAccessUnit accessUnit;
     if (!encoder_.encode(texture, info, accessUnit)) return;
-    videoStream_.sendFrame(accessUnit.annexB, accessUnit.keyFrame, accessUnit.timestampUs ? accessUnit.timestampUs : info.timestampUs);
+    const uint64_t timestamp =
+        accessUnit.timestampUs ? accessUnit.timestampUs : info.timestampUs;
+
+    if (quicReady) {
+        const uint16_t maxDatagram =
+            quicServer_->datagramLimits().maxSendLength;
+        if (maxDatagram > 32) {
+            const uint8_t flags = accessUnit.keyFrame ? 0x01 : 0x00;
+            const auto fragments = video::fragmentAccessUnit(
+                ++quicFrameId_,
+                video::Codec::H264,
+                flags,
+                timestamp,
+                accessUnit.annexB,
+                maxDatagram);
+
+            bool allSent = !fragments.empty();
+            for (const auto& fragment : fragments) {
+                if (!quicServer_->sendVideoDatagram(
+                        fragment.data(), fragment.size())) {
+                    allSent = false;
+                    break;
+                }
+            }
+            if (!allSent) encoder_.requestKeyFrame();
+        }
+    } else if (tcpReady) {
+        videoStream_.sendFrame(
+            accessUnit.annexB,
+            accessUnit.keyFrame,
+            timestamp);
+    }
 }
 }
