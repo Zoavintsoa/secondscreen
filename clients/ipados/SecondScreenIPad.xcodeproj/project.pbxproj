@@ -1,0 +1,54 @@
+// !$*UTF8*$!
+{
+ archiveVersion = 1;
+ classes = {
+ };
+ objectVersion = 56;
+ objects = {
+
+/* Begin PBXBuildFile section */
+    A00000000000000000000001 = {isa = PBXBuildFile; fileRef = A00000000000000000000011; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+    A00000000000000000000010 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SecondScreenIPad.app; sourceTree = BUILT_PRODUCTS_DIR; };
+    A00000000000000000000011 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondScreenIPadApp.swift; sourceTree = "<group>"; };
+    A00000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+    A00000000000000000000020 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+    A00000000000000000000030 = {isa = PBXGroup; children = (A00000000000000000000031, A00000000000000000000032,); sourceTree = "<group>"; };
+    A00000000000000000000031 = {isa = PBXGroup; children = (A00000000000000000000011, A00000000000000000000012,); path = SecondScreenIPad; sourceTree = "<group>"; };
+    A00000000000000000000032 = {isa = PBXGroup; children = (A00000000000000000000010,); name = Products; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+    A00000000000000000000040 = {isa = PBXNativeTarget; buildConfigurationList = A00000000000000000000050; buildPhases = (A00000000000000000000060, A00000000000000000000020,); buildRules = (); dependencies = (); name = SecondScreenIPad; productName = SecondScreenIPad; productReference = A00000000000000000000010; productType = "com.apple.product-type.application"; };
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+    A00000000000000000000041 = {isa = PBXProject; attributes = { LastUpgradeCheck = 1600; ORGANIZATIONNAME = Zoavintsoa; TargetAttributes = { A00000000000000000000040 = { CreatedOnToolsVersion = 16.0; }; }; }; buildConfigurationList = A00000000000000000000051; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en,); mainGroup = A00000000000000000000030; productRefGroup = A00000000000000000000032; projectDirPath = ""; projectRoot = ""; targets = (A00000000000000000000040,); };
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+    A00000000000000000000060 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+    A00000000000000000000070 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenIPad/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.ipad; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; }; name = Debug; };
+    A00000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenIPad/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.ipad; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; }; name = Release; };
+    A00000000000000000000072 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Debug; };
+    A0000000000000000000073 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Release; };
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+    A00000000000000000000050 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000070, A00000000000000000000071,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+    A00000000000000000000051 = {isa = XCConfigurationList; buildConfigurations = (A00000000000000000000072, A000000000000000000000073,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+ };
+ rootObject = A00000000000000000000041;
+}
