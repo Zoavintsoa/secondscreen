@@ -48,7 +48,7 @@ Production transport is QUIC:
 - stale video datagrams may be discarded instead of blocking newer frames;
 - a reliable control path remains available even when video packets are lost.
 
-The Windows implementation targets MsQuic. Android will use a native MsQuic adapter. Apple-native implementations may use Network.framework QUIC while keeping the same application protocol.
+The Windows implementation targets MsQuic. Android keeps a native QUIC transport adapter boundary; MsQuic is the preferred candidate but its Android support is currently best-effort, so the implementation must remain replaceable until real-device validation. Apple-native implementations may use Network.framework QUIC while keeping the same application protocol.
 
 TCP is retained only as a deterministic bring-up transport until QUIC is integrated.
 
