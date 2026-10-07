@@ -4,6 +4,11 @@
 
 namespace second_screen {
 
+namespace {
+constexpr uint16_t kControlPort = 49152;
+constexpr uint16_t kVideoBringUpPort = 49153;
+}
+
 HostServer::HostServer() = default;
 HostServer::~HostServer() { stop(); }
 
@@ -16,13 +21,13 @@ bool HostServer::start() {
         return false;
     }
 
-    if (!discovery_.start("SecondScreen Host", 49152)) {
+    if (!discovery_.start("SecondScreen Host", kControlPort, kVideoBringUpPort)) {
         WSACleanup();
         running_ = false;
         return false;
     }
 
-    if (!videoStream_.start(49152)) {
+    if (!videoStream_.start(kVideoBringUpPort)) {
         discovery_.stop();
         WSACleanup();
         running_ = false;
