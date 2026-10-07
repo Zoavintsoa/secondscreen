@@ -134,6 +134,14 @@ bool H264Encoder::configureEncoder() {
     hr = transform_->SetOutputType(0, outputType_.Get(), 0);
     if (FAILED(hr)) return false;
 
+    UINT32 sequenceSize = 0;
+    BYTE* sequenceData = nullptr;
+    if (SUCCEEDED(outputType_->GetAllocatedBlob(
+            MF_MT_MPEG_SEQUENCE_HEADER, &sequenceData, &sequenceSize))) {
+        sequenceHeader_.assign(sequenceData, sequenceData + sequenceSize);
+        CoTaskMemFree(sequenceData);
+    }
+
     hr = MFCreateMediaType(&inputType_);
     if (FAILED(hr)) return false;
 
