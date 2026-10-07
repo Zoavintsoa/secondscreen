@@ -1,8 +1,24 @@
 #include "HostServer.h"
+#include "../../../shared-protocol/VIDEO_FRAGMENT.h"
+#include <cstdlib>
+#include <iostream>
+#include <windows.h>
 #include <winsock2.h>
 
 namespace second_screen {
-namespace { constexpr uint16_t kControlPort=49152; constexpr uint16_t kVideoBringUpPort=49153; }
+namespace {
+constexpr uint16_t kControlPort=49152;
+constexpr uint16_t kVideoBringUpPort=49153;
+std::string readQuicCertificateThumbprint() {
+    char buffer[256]{};
+    const DWORD length = GetEnvironmentVariableA(
+        "SECOND_SCREEN_QUIC_CERT_THUMBPRINT",
+        buffer,
+        static_cast<DWORD>(sizeof(buffer)));
+    if (length == 0 || length >= sizeof(buffer)) return {};
+    return std::string(buffer, length);
+}
+}
 
 HostServer::HostServer() = default;
 HostServer::~HostServer() { stop(); }
