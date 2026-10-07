@@ -18,7 +18,7 @@ object DeviceCapabilitiesProbe {
         return "{\"platform\":\"android\",\"api\":"+c.api+",\"model\":\""+escape(c.model)+"\",\"manufacturer\":\""+escape(c.manufacturer)+"\",\"touch\":"+c.touch+",\"stylus\":"+c.stylus+",\"refreshHz\":"+c.refreshHz+",\"hdr\":"+c.hdr+",\"codecs\":["+codecs+"]}"
     }
 
-    fun probe(context:Context) {
+    fun probe(context:Context):DeviceCapabilities {
         val pm=context.packageManager
         val display=if(Build.VERSION.SDK_INT>=30) context.getSystemService(WindowManager::class.java)?.defaultDisplay
         else @Suppress("DEPRECATION") (context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager)?.defaultDisplay
