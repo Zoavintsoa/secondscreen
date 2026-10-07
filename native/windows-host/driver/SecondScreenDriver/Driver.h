@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "Trace.h"
+#include "DriverFramePublisher.h"
 
 namespace Microsoft
 {
@@ -86,6 +87,7 @@ namespace Microsoft
             HANDLE m_hAvailableBufferEvent;
             Microsoft::WRL::Wrappers::Thread m_hThread;
             Microsoft::WRL::Wrappers::Event m_hTerminateEvent;
+            DriverFramePublisher m_FramePublisher;
         };
 
         /// <summary>
