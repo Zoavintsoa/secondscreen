@@ -1,0 +1,10 @@
+{
+  "name": "secondscreen",
+  "version-string": "0.1.0",
+  "dependencies": [
+    {
+      "name": "ms-quic",
+      "version>=": "2.6.1"
+    }
+  ]
+}
