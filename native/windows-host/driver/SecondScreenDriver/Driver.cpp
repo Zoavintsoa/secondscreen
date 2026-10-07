@@ -502,7 +502,7 @@ void IndirectDeviceContext::InitAdapter()
 
     // Declare your device strings for telemetry (required)
     AdapterCaps.EndPointDiagnostics.pEndPointFriendlyName = L"SecondScreen Device";
-    AdapterCaps.EndPointDiagnostics.pEndPointManufacturerName = L"Microsoft";
+    AdapterCaps.EndPointDiagnostics.pEndPointManufacturerName = L"Zoavintsoa";
     AdapterCaps.EndPointDiagnostics.pEndPointModelName = L"SecondScreen Model";
 
     // Declare your hardware and firmware versions (required)
