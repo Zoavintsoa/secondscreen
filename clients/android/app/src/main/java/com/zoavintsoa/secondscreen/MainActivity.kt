@@ -13,7 +13,7 @@ import java.util.concurrent.CountDownLatch
 
 class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
-    private lateinit var client: SecondScreenClient
+    private var client: SecondScreenClient? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -26,6 +26,17 @@ class MainActivity : ComponentActivity() {
             showAbout()
         }
 
+        if (legalAccepted()) {
+            initializeClient()
+        } else {
+            window.decorView.post { showLegalNotice() }
+        }
+    }
+
+    private fun legalAccepted(): Boolean =
+        getPreferences(Context.MODE_PRIVATE).getBoolean("legal_accepted_v1", false)
+
+    private fun initializeClient() {
         val surface = findViewById<android.view.SurfaceView>(R.id.videoSurface)
         client = SecondScreenClient(
             this,
@@ -34,14 +45,7 @@ class MainActivity : ComponentActivity() {
             { hostName -> requestPairingCode(hostName) }
         )
         surface.holder.addCallback(client)
-
-        if (!legalAccepted()) {
-            window.decorView.post { showLegalNotice() }
-        }
     }
-
-    private fun legalAccepted(): Boolean =
-        getPreferences(Context.MODE_PRIVATE).getBoolean("legal_accepted_v1", false)
 
     private fun showLegalNotice() {
         AlertDialog.Builder(this)
@@ -56,6 +60,7 @@ class MainActivity : ComponentActivity() {
                     .edit()
                     .putBoolean("legal_accepted_v1", true)
                     .apply()
+                initializeClient()
             }
             .setCancelable(false)
             .show()
@@ -101,7 +106,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        client.close()
+        client?.close()
+        client = null
         super.onDestroy()
     }
 }
