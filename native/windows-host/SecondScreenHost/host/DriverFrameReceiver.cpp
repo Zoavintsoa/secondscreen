@@ -7,9 +7,7 @@
 
 namespace second_screen {
 
-DriverFrameReceiver::~DriverFrameReceiver() {
-    stop();
-}
+DriverFrameReceiver::~DriverFrameReceiver() { stop(); }
 
 bool DriverFrameReceiver::start(HostServer* host) {
     if (!host || running_.exchange(true)) return true;
@@ -39,15 +37,33 @@ void DriverFrameReceiver::stop() {
 bool DriverFrameReceiver::openSharedState() {
     stateMapping_ = OpenFileMappingW(FILE_MAP_READ, FALSE, frame_ipc::kStateName);
     if (!stateMapping_) return false;
-    stateView_ = MapViewOfFile(stateMapping_, FILE_MAP_READ, 0, 0, sizeof(frame_ipc::SharedState));
-    if (!stateView_) return false;
+
+    stateView_ = MapViewOfFile(
+        stateMapping_, FILE_MAP_READ, 0, 0, sizeof(frame_ipc::SharedState));
+    if (!stateView_) {
+        CloseHandle(stateMapping_);
+        stateMapping_ = nullptr;
+        return false;
+    }
 
     readyEvent_ = OpenEventW(SYNCHRONIZE, FALSE, frame_ipc::kReadyEventName);
-    return readyEvent_ != nullptr;
+    if (!readyEvent_) {
+        UnmapViewOfFile(stateView_);
+        stateView_ = nullptr;
+        CloseHandle(stateMapping_);
+        stateMapping_ = nullptr;
+        return false;
+    }
+
+    return true;
 }
 
 bool DriverFrameReceiver::openDevice() {
     auto* state = static_cast<frame_ipc::SharedState*>(stateView_);
+    if (state->magic != frame_ipc::kMagic || state->version != frame_ipc::kVersion) {
+        return false;
+    }
+
     adapterLuid_ = state->adapterLuid;
 
     Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
@@ -59,8 +75,10 @@ bool DriverFrameReceiver::openDevice() {
     D3D_FEATURE_LEVEL level{};
     if (FAILED(D3D11CreateDevice(
         adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
-        D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0,
-        D3D11_SDK_VERSION, &device_, &level, &context_))) return false;
+        D3D11_CREATE_DEVICE_BGRA_SUPPORT | D3D11_CREATE_DEVICE_VIDEO_SUPPORT,
+        nullptr, 0, D3D11_SDK_VERSION, &device_, &level, &context_))) {
+        return false;
+    }
 
     return SUCCEEDED(device_.As(&device1_));
 }
@@ -73,7 +91,9 @@ bool DriverFrameReceiver::openTexture(uint32_t slot) {
         frame_ipc::kTextureNames[slot],
         DXGI_SHARED_RESOURCE_READ,
         __uuidof(ID3D11Texture2D),
-        reinterpret_cast<void**>(textures_[slot].GetAddressOf())))) return false;
+        reinterpret_cast<void**>(textures_[slot].GetAddressOf())))) {
+        return false;
+    }
 
     return SUCCEEDED(textures_[slot].As(&mutexes_[slot]));
 }
@@ -103,6 +123,7 @@ void DriverFrameReceiver::run() {
         const uint64_t timestampUs = state->timestampUs;
         const auto sequenceAfterSnapshot = static_cast<uint64_t>(
             InterlockedCompareExchange64(&state->sequence, 0, 0));
+
         if (sequence != sequenceAfterSnapshot) continue;
 
         if (slot < 0 || slot >= 3 || width == 0 || height == 0) {
@@ -121,7 +142,7 @@ void DriverFrameReceiver::run() {
         info.width = width;
         info.height = height;
         info.timestampUs = timestampUs;
-        info.keyFrame = (sequence == 1);
+        info.keyFrame = false;
 
         host_->submitFrame(textures_[slot].Get(), info);
         mutexes_[slot]->ReleaseSync(0);
