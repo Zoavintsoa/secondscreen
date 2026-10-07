@@ -7,6 +7,8 @@ import android.view.SurfaceHolder
 import java.io.BufferedInputStream
 import java.io.DataInputStream
 import java.net.InetSocketAddress
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.net.Socket
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -24,6 +26,8 @@ class SecondScreenClient(
     // Current bring-up endpoint. Discovery/pairing replaces this with the
     // selected host once the control protocol is connected.
     private var discoveredHost: HostAdvertisement? = null
+    private var streamWidth = 1920
+    private var streamHeight = 1080
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         start()
@@ -89,8 +93,12 @@ class SecondScreenClient(
             val accessUnit = ByteArray(length)
             input.readFully(accessUnit)
 
+            if ((flags and 2) != 0) {
+                // Configuration access units are decoder-specific. Keep the decoder
+                // alive and let MediaCodec consume SPS/PPS/VPS from the Annex-B stream.
+            }
             if (!configured) {
-                configureDecoder(codec)
+                configureDecoder(codec, streamWidth, streamHeight)
                 configured = true
             }
 
@@ -117,7 +125,7 @@ class SecondScreenClient(
         }
     }
 
-    private fun configureDecoder(codecId: Int) {
+    private fun configureDecoder(codecId: Int, width: Int, height: Int) {
         releaseDecoder()
         val mime = when (codecId) {
             1 -> "video/avc"
@@ -125,7 +133,8 @@ class SecondScreenClient(
             else -> error("Unsupported codec: $codecId")
         }
 
-        val format = MediaFormat.createVideoFormat(mime, 1920, 1080)
+        val format = MediaFormat.createVideoFormat(mime, width, height)
+        format.setInteger(MediaFormat.KEY_PRIORITY, 0)
         format.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16 * 1024 * 1024)
         decoder = MediaCodec.createDecoderByType(mime).also {
             it.configure(format, surface.surface, null, 0)
