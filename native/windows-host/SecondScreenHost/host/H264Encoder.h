@@ -8,6 +8,7 @@
 #include <mfidl.h>
 
 #include "FrameBridge.h"
+#include "GpuVideoConverter.h"
 
 namespace second_screen {
 
@@ -50,6 +51,9 @@ private:
     bool forceKeyFrame_{false};
     bool started_{false};
     std::vector<uint8_t> sequenceHeader_;
+    GpuVideoConverter converter_;
+    Microsoft::WRL::ComPtr<ID3D11Device> d3dDevice_;
+    bool d3dConfigured_{false};
 };
 
 }
