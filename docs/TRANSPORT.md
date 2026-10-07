@@ -10,7 +10,7 @@ Production transport is QUIC.
 - Video loss must not block later video.
 - Control remains reliable even when video is lost.
 
-The Windows host targets Microsoft MsQuic. MsQuic officially supports Windows and Linux, including Android, and exposes QUIC datagrams. The implementation will therefore keep one application protocol while using a native transport adapter per platform.
+The Windows host targets Microsoft MsQuic. MsQuic officially supports Windows and Linux; its current documentation describes Android as a platform it may work on, but without the same support guarantee as Windows/Linux. We therefore keep a native transport abstraction and will validate the Android MsQuic route before making it the only Android production option.
 
 ## Bring-up
 
