@@ -101,6 +101,22 @@ A checkbox is not marked complete because code exists. It is complete only after
 - No device-specific manufacturer/model assumptions were introduced.
 
 
+### 2026-10-08 deep consistency and reliability pass
+- [x] Fix Android pairing so a newly paired client receives the same baseline stream configuration as the host.
+- [x] Reconnect with a fresh control socket after an expired/revoked session token; do not reuse a server-closed TCP session.
+- [x] Harden the Windows TCP control server to drain multiple complete frames from a single `recv` while preserving partial-frame accumulation.
+- [x] Remove the unsupported private macOS `CGVirtualDisplay` declarations from the active virtual-display boundary.
+- [x] Make the legacy macOS capture/VideoToolbox scaffolds report capability honestly instead of claiming hardware validation.
+- [x] Repair the macOS Xcode project object identifiers and keep the host deployment target at macOS 10.15.
+- [x] Add in-app About/Terms/Privacy surfaces to Android and About/Terms/Privacy surfaces to iPadOS.
+- [x] Embed the `SecondScreen — Zoavintsoa` identity in native Windows host code and mobile/Apple metadata.
+- [x] Remove obsolete Gemini/cloud capability metadata; SecondScreen remains local-first.
+- [x] Mark the older root CMake Windows host targets as legacy and remove the obsolete Windows CI workflow that built the wrong architecture.
+- [ ] Build and run the canonical Windows host CI successfully after this pass.
+- [ ] Build and run Android/iPadOS/macOS CI successfully after this pass.
+- [ ] Validate QUIC from a real Android client; the current Android JNI MsQuic boundary remains deliberately unavailable.
+- [ ] Validate the real Windows IddCx display and GPU pipeline on physical hardware.
+
 ### 2026-10-08 legacy Intel Mac pass
 - [x] Define Catalina/Big Sur compatibility target for old Intel Macs.
 - [x] Lower the macOS host deployment target to macOS 10.15.
