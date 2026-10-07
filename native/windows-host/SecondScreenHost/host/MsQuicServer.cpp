@@ -41,8 +41,6 @@ struct MsQuicServer::Impl {
 };
 
 #if SECOND_SCREEN_HAS_MSQUIC
-
-struct ConnectionContext;
 namespace {
 
 using second_screen::control::ControlFrameParser;
