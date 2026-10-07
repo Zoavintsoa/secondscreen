@@ -76,7 +76,7 @@ void ControlServer::acceptLoop() {
         {
             std::lock_guard lock(clientMutex_);
             if (clientSocket_ == client) {
-                closesocket(clientSocket_);
+                closesocket(client);
                 clientSocket_ = INVALID_SOCKET;
             }
         }
@@ -121,34 +121,54 @@ void ControlServer::clientLoop(SOCKET client) {
     };
 
     bool authenticated = false;
+    bool stopClient = false;
 
-    while (running_) {
-        const int received = recv(client, reinterpret_cast<char*>(buffer.data()),
-                                  static_cast<int>(buffer.size()), 0);
+    while (running_ && !stopClient) {
+        const int received = recv(
+            client,
+            reinterpret_cast<char*>(buffer.data()),
+            static_cast<int>(buffer.size()),
+            0);
         if (received <= 0) break;
 
         ControlMessage message;
-        const auto status = parser.push(buffer.data(), static_cast<size_t>(received), message);
-        if (status == ParseStatus::Invalid) break;
-        if (status == ParseStatus::NeedMoreData) continue;
+        auto status = parser.push(buffer.data(), static_cast<size_t>(received), message);
 
-        const auto action = session.onMessage(message);
-        if (!sendAction(action)) break;
-
-        if (message.type == second_screen::control::MessageType::Hello && action.accepted) {
-            const auto challenge = pairing_.createChallenge(session.identity().deviceId);
-            if (!challenge.code.empty()) {
-                std::cout << "[SecondScreen] Pairing code for " << session.identity().deviceId
-                          << ": " << challenge.code << " (valid 120s)" << std::endl;
+        // TCP is a byte stream: one recv may contain several frames, or only
+        // part of one. Drain every complete frame already accumulated before
+        // waiting for another recv.
+        while (status == ParseStatus::MessageReady) {
+            const auto action = session.onMessage(message);
+            if (!sendAction(action)) {
+                stopClient = true;
+                break;
             }
+
+            if (message.type == second_screen::control::MessageType::Hello && action.accepted) {
+                const auto challenge = pairing_.createChallenge(session.identity().deviceId);
+                if (!challenge.code.empty()) {
+                    std::cout << "[SecondScreen] Pairing code for "
+                              << session.identity().deviceId
+                              << ": " << challenge.code << " (valid 120s)" << std::endl;
+                }
+            }
+
+            if (action.authenticated && !authenticated) {
+                authenticated = true;
+                if (authCallback_) authCallback_(true);
+            }
+            if (action.requestKeyframe && keyframeCallback_) keyframeCallback_();
+            if (action.close) {
+                stopClient = true;
+                break;
+            }
+
+            status = parser.push(nullptr, 0, message);
         }
 
-        if (action.authenticated && !authenticated) {
-            authenticated = true;
-            if (authCallback_) authCallback_(true);
+        if (status == ParseStatus::Invalid) {
+            stopClient = true;
         }
-        if (action.requestKeyframe && keyframeCallback_) keyframeCallback_();
-        if (action.close) break;
     }
 
     if (authenticated && authCallback_) authCallback_(false);
