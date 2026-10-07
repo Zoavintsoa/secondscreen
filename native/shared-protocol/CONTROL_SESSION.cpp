@@ -26,7 +26,8 @@ bool findValue(std::string_view json, std::string_view key, size_t& valueStart) 
 }
 }
 
-ControlSession::ControlSession(uint32_t maxPayloadBytes) : parser_(maxPayloadBytes) {}
+ControlSession::ControlSession(SecurityCallbacks security, uint32_t maxPayloadBytes)
+    : security_(std::move(security)), parser_(maxPayloadBytes) {}
 
 void ControlSession::reset() {
     state_ = SessionState::Disconnected;
@@ -111,8 +112,11 @@ SessionAction ControlSession::onMessage(const ControlMessage& message) {
             action.close = true;
             return action;
         }
-        // Credential validation is deliberately delegated to the host security layer.
-        // The transport-neutral session only enforces the protocol state transition.
+        if (!security_.validateSessionToken ||
+            !security_.validateSessionToken(identity_.deviceId, token)) {
+            action.close = true;
+            return action;
+        }
         state_ = SessionState::Authenticated;
         action.accepted = true;
         action.authenticated = true;
