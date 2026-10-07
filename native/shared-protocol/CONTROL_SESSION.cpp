@@ -64,7 +64,7 @@ SessionAction ControlSession::onMessage(const ControlMessage& message) {
         state_ = SessionState::HelloReceived;
         action.accepted = true;
         action.responseType = MessageType::Capabilities;
-        action.responseJson = "{\"protocolMajor\":1,\"protocolMinor\":1,\"pairingRequired\":true,\"transport\":\"tcp-bringup\"}";
+        action.responseJson = "{\"protocolMajor\":1,\"protocolMinor\":1,\"pairingRequired\":true,\"transport\":\"quic-preferred\"}";
         return action;
     }
     case MessageType::PairRequest: {
@@ -78,9 +78,17 @@ SessionAction ControlSession::onMessage(const ControlMessage& message) {
         const std::string token = security_.issueSessionToken(identity_.deviceId);
         if (token.size() != 64) { action.close = true; return action; }
         state_ = SessionState::Authenticated;
-        action.accepted = true; action.authenticated = true; action.requestKeyframe = true;
+        action.accepted = true;
+        action.authenticated = true;
+        action.requestKeyframe = true;
         action.responseType = MessageType::PairResponse;
-        action.responseJson = std::string("{\"status\":\"paired\",\"sessionToken\":\"") + token + "\"}";
+        // Pairing must also return the negotiated baseline. Otherwise a freshly
+        // paired client can decode with a stale/default resolution while the host
+        // is already encoding at another configuration.
+        action.responseJson =
+            std::string("{\"status\":\"paired\",\"sessionToken\":\"") + token +
+            "\",\"codec\":\"h264\",\"width\":1920,\"height\":1080,\"fps\":60,"
+            "\"bitrateKbps\":8000,\"maxLatencyMs\":50,\"profileId\":\"balanced\"}";
         return action;
     }
     case MessageType::Auth: {
