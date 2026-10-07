@@ -39,11 +39,21 @@ bool HostServer::start() {
         return false;
     }
 
+    if (!frameReceiver_.start(this)) {
+        frameBridge_.stop();
+        videoStream_.stop();
+        discovery_.stop();
+        WSACleanup();
+        running_ = false;
+        return false;
+    }
+
     return true;
 }
 
 void HostServer::stop() {
     if (!running_.exchange(false)) return;
+    frameReceiver_.stop();
     frameBridge_.stop();
     encoder_.shutdown();
     videoStream_.stop();
