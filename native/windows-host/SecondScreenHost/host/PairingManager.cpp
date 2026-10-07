@@ -5,10 +5,26 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <algorithm>
 
 #pragma comment(lib, "Bcrypt.lib")
 
 namespace second_screen {
+
+namespace {
+bool constantTimeEqual(const std::string& a, const std::string& b) {
+    const size_t maxLen = std::max(a.size(), b.size());
+    unsigned char diff = static_cast<unsigned char>(a.size() ^ b.size());
+    for (size_t i = 0; i < maxLen; ++i) {
+        const unsigned char av = i < a.size()
+            ? static_cast<unsigned char>(a[i]) : 0;
+        const unsigned char bv = i < b.size()
+            ? static_cast<unsigned char>(b[i]) : 0;
+        diff = static_cast<unsigned char>(diff | (av ^ bv));
+    }
+    return diff == 0;
+}
+} // namespace
 
 uint64_t PairingManager::nowUnixMs() {
     using namespace std::chrono;
@@ -60,7 +76,7 @@ bool PairingManager::confirm(const std::string& deviceId, const std::string& cod
     const auto it = pending_.find(deviceId);
     if (it == pending_.end()) return false;
 
-    const bool valid = it->second.code == code && nowUnixMs() <= it->second.expiresAtUnixMs;
+    const bool valid = constantTimeEqual(it->second.code, code) && nowUnixMs() <= it->second.expiresAtUnixMs;
     pending_.erase(it);
     return valid;
 }
@@ -77,7 +93,7 @@ bool PairingManager::validateSessionToken(const std::string& deviceId,
                                           const std::string& token) const {
     std::lock_guard lock(mutex_);
     const auto it = sessions_.find(deviceId);
-    return it != sessions_.end() && it->second == token && !token.empty();
+    return it != sessions_.end() && !token.empty() && constantTimeEqual(it->second, token);
 }
 
 void PairingManager::revoke(const std::string& deviceId) {
