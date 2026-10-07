@@ -101,6 +101,9 @@ void DriverFrameReceiver::run() {
         const uint32_t width = state->width;
         const uint32_t height = state->height;
         const uint64_t timestampUs = state->timestampUs;
+        const auto sequenceAfterSnapshot = static_cast<uint64_t>(
+            InterlockedCompareExchange64(&state->sequence, 0, 0));
+        if (sequence != sequenceAfterSnapshot) continue;
 
         if (slot < 0 || slot >= 3 || width == 0 || height == 0) {
             lastSequence_ = sequence;
