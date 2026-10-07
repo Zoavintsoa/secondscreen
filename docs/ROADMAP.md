@@ -83,3 +83,12 @@
 ### Rule
 
 A checkbox is not marked complete because code exists. It is complete only after the corresponding real-hardware acceptance test is passed.
+
+
+## 2026-10-08 implementation pass
+- Windows control channel now uses the shared SSCP parser/session and PairingManager callbacks.
+- Pairing uses a short-lived six-digit host challenge and a separate 256-bit session token.
+- Android persists the session token locally and prompts for the host pairing code only when needed.
+- Video bring-up is now gated on an authenticated control session.
+- Native macOS and iPadOS Xcode projects were added and are included in CI.
+- MsQuic production transport remains the next transport implementation; no hardware acceptance is claimed yet.
