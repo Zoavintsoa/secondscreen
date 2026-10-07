@@ -126,12 +126,15 @@ bool DriverFramePublisher::publish(ID3D11Texture2D* source, uint64_t timestampUs
         state->width = width_;
         state->height = height_;
         state->timestampUs = timestampUs;
-        state->adapterLuid = [&] {
-            LUID luid{};
-            Microsoft::WRL::ComPtr<IDXGIDevice> dxgi;
-            if (SUCCEEDED(device_.As(&dxgi))) dxgi->GetAdapter(&dxgi);
-            return luid;
-        }();
+        LUID luid{};
+        Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
+        Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+        if (SUCCEEDED(device_.As(&dxgiDevice)) &&
+            SUCCEEDED(dxgiDevice->GetAdapter(&adapter))) {
+            DXGI_ADAPTER_DESC desc{};
+            if (SUCCEEDED(adapter->GetDesc(&desc))) luid = desc.AdapterLuid;
+        }
+        state->adapterLuid = luid;
 
         state->slot = static_cast<LONG>(index);
         InterlockedExchange64(&state->sequence, ++sequence_);
