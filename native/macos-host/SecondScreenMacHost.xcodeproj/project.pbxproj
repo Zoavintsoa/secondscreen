@@ -43,12 +43,12 @@
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
-    A00000000000000000000060 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001, A00000000000000000000000002, A00000000000000000000000003, A00000000000000000000000004, A00000000000000000000000005,); runOnlyForDeploymentPostprocessing = 0; };
+    A00000000000000000000060 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A00000000000000000000001, A00000000000000000000002, A00000000000000000000003, A00000000000000000000004, A00000000000000000000005,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
     A00000000000000000000070 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenMacHost/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.machost; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; MACOSX_DEPLOYMENT_TARGET = 10.15; }; name = Debug; };
-    A00000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenMacHost/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.machost; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; MACOSX_DEPLOYMENT_TARGET = 13.0; }; name = Release; };
+    A00000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenMacHost/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.machost; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; MACOSX_DEPLOYMENT_TARGET = 10.15; }; name = Release; };
     A00000000000000000000072 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Debug; };
     A0000000000000000000073 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Release; };
 /* End XCBuildConfiguration section */
