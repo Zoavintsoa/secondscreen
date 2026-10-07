@@ -5,15 +5,10 @@
 namespace second_screen {
 
 HostServer::HostServer() = default;
-
-HostServer::~HostServer() {
-    stop();
-}
+HostServer::~HostServer() { stop(); }
 
 bool HostServer::start() {
-    if (running_.exchange(true)) {
-        return true;
-    }
+    if (running_.exchange(true)) return true;
 
     WSADATA data{};
     if (WSAStartup(MAKEWORD(2, 2), &data) != 0) {
@@ -21,24 +16,76 @@ bool HostServer::start() {
         return false;
     }
 
-    // Discovery/control/stream services are intentionally separated from
-    // the IddCx driver. This keeps network failures out of the display path.
     if (!discovery_.start("SecondScreen Host", 49152)) {
-        stop();
+        WSACleanup();
+        running_ = false;
         return false;
     }
+
+    if (!videoStream_.start(49152)) {
+        discovery_.stop();
+        WSACleanup();
+        running_ = false;
+        return false;
+    }
+
+    if (!frameBridge_.start([this](ID3D11Texture2D* texture, const FrameInfo& info) {
+        onFrame(texture, info);
+    })) {
+        videoStream_.stop();
+        discovery_.stop();
+        WSACleanup();
+        running_ = false;
+        return false;
+    }
+
     return true;
 }
 
 void HostServer::stop() {
-    if (!running_.exchange(false)) {
-        return;
-    }
-
+    if (!running_.exchange(false)) return;
+    frameBridge_.stop();
+    encoder_.shutdown();
+    videoStream_.stop();
     discovery_.stop();
     controlThread_.reset();
     discoveryThread_.reset();
     WSACleanup();
+}
+
+bool HostServer::submitFrame(ID3D11Texture2D* texture, const FrameInfo& info) {
+    if (!running_ || !texture) return false;
+    return frameBridge_.submitGpuFrame(texture, info);
+}
+
+void HostServer::onFrame(ID3D11Texture2D* texture, const FrameInfo& info) {
+    if (!videoStream_.hasClient()) return;
+
+    std::lock_guard lock(pipelineMutex_);
+
+    if (encoderWidth_ != info.width || encoderHeight_ != info.height || encoderFps_ == 0) {
+        encoder_.shutdown();
+        encoderWidth_ = info.width;
+        encoderHeight_ = info.height;
+        encoderFps_ = 60;
+
+        if (!encoder_.initialize(encoderWidth_, encoderHeight_, encoderFps_, 8000)) {
+            encoderWidth_ = encoderHeight_ = encoderFps_ = 0;
+            return;
+        }
+        encoder_.requestKeyFrame();
+    }
+
+    EncodedAccessUnit accessUnit;
+    if (!encoder_.encode(texture, info, accessUnit)) return;
+
+    const auto packet = makeVideoFrame(
+        1,
+        static_cast<uint8_t>(accessUnit.keyFrame ? 0x01 : 0x00),
+        accessUnit.timestampUs ? accessUnit.timestampUs : info.timestampUs,
+        accessUnit.annexB);
+
+    videoStream_.sendFrame(packet);
 }
 
 }
