@@ -49,3 +49,9 @@ Authentication is application-level identity layered on top of QUIC:
 - authenticated input.
 
 The pairing code must never become the session secret.
+
+
+## Current implementation status
+The shared control protocol and session state machine are now connected to the Windows TCP bring-up path. This is intentionally a staging layer: production transport remains MsQuic with a reliable control stream and QUIC datagrams. The legacy TCP video path is not considered the production transport.
+
+MsQuic is the next transport implementation. The Android transport stays behind the adapter boundary because official MsQuic platform support does not make Android a guaranteed production target yet.
