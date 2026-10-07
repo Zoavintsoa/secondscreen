@@ -23,13 +23,13 @@
 - [ ] Harden IddCx frame handoff and keep driver frame loop minimal
 - [x] Harden pairing credential comparison against timing leaks
 - [x] MsQuic host transport implementation (Windows listener, TLS credentials, control stream, negotiated datagram size, SSVG send path; hardware acceptance pending)
-- [ ] MsQuic Android transport adapter
+- [ ] MsQuic Android transport adapter (JNI boundary and safe unavailable stub added)
 - [ ] Authenticated pairing end-to-end
 - [x] Bounded control-frame parser and framing implementation
 - [x] Transport-neutral control session state machine with host security callbacks
 - [x] QUIC datagram video fragmentation contract
-- [ ] Dynamic STREAM_CONFIG on Android
-- [ ] Keyframe request/recovery
+- [x] Android STREAM_CONFIG parser/reconfiguration path (host policy still fixed until Smart Engine integration)
+- [x] Android keyframe-request/recovery hooks (QUIC loss callback integration still pending)
 - [ ] Adaptive bitrate/FPS controller
 - [ ] Real virtual display -> Android video path
 - [ ] Touch/stylus return channel
@@ -66,7 +66,7 @@
 - [ ] Virtual display implementation based only on supported Apple APIs
 - [ ] ScreenCaptureKit capture
 - [ ] VideoToolbox encode
-- [ ] iPadOS client
+- [x] iPadOS 13 compatibility floor and capability detection foundation
 - [ ] Metal renderer
 - [ ] Apple Pencil/touch input
 
@@ -92,3 +92,10 @@ A checkbox is not marked complete because code exists. It is complete only after
 - Video bring-up is now gated on an authenticated control session.
 - Native macOS and iPadOS Xcode projects were added and are included in CI.
 - MsQuic production transport remains the next transport implementation; no hardware acceptance is claimed yet.
+
+### 2026-10-08 compatibility pass
+- Android target is capability-driven from API 26 upward: codec, resolution, frame-rate, HDR, refresh-rate, touch and stylus probing are implemented.
+- Android H.264 remains the baseline; HEVC is selected only when negotiated.
+- A native QUIC JNI boundary is present and deliberately reports unavailable until upstream MsQuic is actually linked and validated; TCP is never mislabeled as QUIC.
+- iPadOS deployment target is 13.0 with availability-safe capability probing for H.264, HEVC, Metal and Pencil.
+- No device-specific manufacturer/model assumptions were introduced.
