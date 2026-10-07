@@ -14,6 +14,8 @@ This repository is not a web page. The old web prototype is not the product.
 
 ## Native architecture
 
+The canonical native Windows implementation is under `native/windows-host/` and is the implementation used by the current native CI. The older `native/windows/` tree is retained as a legacy prototype/reference and is not the shipped host.
+
 ### Windows host
 - Windows Indirect Display Driver (IddCx)
 - GPU-backed frame bridge
