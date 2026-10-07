@@ -22,7 +22,7 @@
 
 - [ ] Harden IddCx frame handoff and keep driver frame loop minimal
 - [x] Harden pairing credential comparison against timing leaks
-- [ ] MsQuic host transport
+- [x] MsQuic host transport implementation (Windows listener, TLS credentials, control stream, negotiated datagram size, SSVG send path; hardware acceptance pending)
 - [ ] MsQuic Android transport adapter
 - [ ] Authenticated pairing end-to-end
 - [x] Bounded control-frame parser and framing implementation
