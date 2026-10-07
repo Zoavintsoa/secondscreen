@@ -91,29 +91,51 @@ class SecondScreenClient(
     private fun consumeVideo(input: DataInputStream) {
         var configured = false
         while (running.get()) {
-            val magic = ByteArray(4); input.readFully(magic)
-            require(magic.contentEquals(byteArrayOf('S'.code.toByte(), 'S'.code.toByte(), 'V'.code.toByte(), 'F'.code.toByte())))
-            val codec = input.readUnsignedByte()
-            val flags = input.readUnsignedByte()
-            input.readUnsignedShort()
-            val timestampUs = input.readLong()
-            val length = input.readInt()
-            require(length in 1..16_777_216)
-            val accessUnit = ByteArray(length); input.readFully(accessUnit)
-            if (!configured) { configureDecoder(codec, streamWidth, streamHeight); configured = true }
-            val d = decoder ?: continue
-            val index = d.dequeueInputBuffer(10_000)
-            if (index >= 0) {
-                val buffer = d.getInputBuffer(index) ?: continue
-                buffer.clear(); buffer.put(accessUnit)
-                d.queueInputBuffer(index, 0, accessUnit.size, timestampUs.coerceAtLeast(0L),
-                    if ((flags and 1) != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
+            val magic = ByteArray(4)
+            input.readFully(magic)
+            when (String(magic, Charsets.US_ASCII)) {
+                "SSVF" -> {
+                    val codec = input.readUnsignedByte()
+                    val flags = input.readUnsignedByte()
+                    input.readUnsignedShort()
+                    val timestampUs = input.readLong()
+                    val length = input.readInt()
+                    require(length in 1..16_777_216)
+                    val accessUnit = ByteArray(length)
+                    input.readFully(accessUnit)
+                    if (!configured) {
+                        configureDecoder(codec, streamWidth, streamHeight)
+                        configured = true
+                    }
+                    queueAccessUnit(codec, accessUnit, timestampUs, (flags and 1) != 0)
+                }
+                "SSVG" -> {
+                    val header = ByteArray(20)
+                    input.readFully(header)
+                    val packet = ByteArray(24 + input.available().coerceAtMost(0))
+                    // TCP bring-up is legacy SSVF; SSVG is reserved for QUIC datagrams.
+                    throw IllegalStateException("SSVG received on TCP bring-up")
+                }
+                else -> throw IllegalStateException("Unknown video frame magic")
             }
-            val info = MediaCodec.BufferInfo()
-            while (true) {
-                val output = d.dequeueOutputBuffer(info, 0)
-                if (output >= 0) d.releaseOutputBuffer(output, true) else break
-            }
+        }
+    }
+
+    private fun queueAccessUnit(codec: Int, accessUnit: ByteArray, timestampUs: Long, keyFrame: Boolean) {
+        if (decoder == null) configureDecoder(codec, streamWidth, streamHeight)
+        val d = decoder ?: return
+        val index = d.dequeueInputBuffer(10_000)
+        if (index >= 0) {
+            val buffer = d.getInputBuffer(index) ?: return
+            buffer.clear()
+            buffer.put(accessUnit)
+            d.queueInputBuffer(index, 0, accessUnit.size, timestampUs.coerceAtLeast(0L),
+                if (keyFrame) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
+        }
+        val info = MediaCodec.BufferInfo()
+        while (true) {
+            val output = d.dequeueOutputBuffer(info, 0)
+            if (output >= 0) d.releaseOutputBuffer(output, true) else break
         }
     }
 
