@@ -25,6 +25,8 @@
     <ClCompile Include="host\GpuVideoConverter.cpp" />
     <ClCompile Include="host\H264Encoder.cpp" />
     <ClCompile Include="host\ControlServer.cpp" />
+    <ClCompile Include="host\MsQuicServer.cpp" />
+    <ClCompile Include="..\..\shared-protocol\QUIC_TRANSPORT.cpp" />
     <ClCompile Include="host\DiscoveryService.cpp" />
     <ClCompile Include="host\PairingManager.cpp" />
     <ClCompile Include="host\VideoStreamServer.cpp" />
@@ -39,6 +41,8 @@
     <ClInclude Include="host\GpuVideoConverter.h" />
     <ClInclude Include="host\H264Encoder.h" />
     <ClInclude Include="host\ControlServer.h" />
+    <ClInclude Include="host\MsQuicServer.h" />
+    <ClInclude Include="..\..\shared-protocol\QUIC_TRANSPORT.h" />
     <ClInclude Include="host\DiscoveryService.h" />
     <ClInclude Include="host\PairingManager.h" />
     <ClInclude Include="host\VideoStreamServer.h" />
