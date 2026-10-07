@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <d3d11.h>
 
 namespace second_screen {
 
@@ -12,17 +13,13 @@ struct FrameInfo {
     bool keyFrame{};
 };
 
-using FrameCallback = std::function<void(const FrameInfo&)>;
+using FrameCallback = std::function<void(ID3D11Texture2D*, const FrameInfo&)>;
 
 class FrameBridge {
 public:
     bool start(FrameCallback callback);
     void stop();
-
-    // Called by the IddCx integration after a frame is acquired.
-    // The production implementation must keep the frame GPU-backed until
-    // the encoder has consumed it.
-    bool submitGpuFrame(void* d3dTexture, const FrameInfo& info);
+    bool submitGpuFrame(ID3D11Texture2D* d3dTexture, const FrameInfo& info);
 
 private:
     FrameCallback callback_;
