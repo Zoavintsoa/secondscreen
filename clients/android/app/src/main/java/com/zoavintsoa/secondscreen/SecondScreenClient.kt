@@ -23,7 +23,7 @@ class SecondScreenClient(
 
     // Current bring-up endpoint. Discovery/pairing replaces this with the
     // selected host once the control protocol is connected.
-    private val hostPort = 49152
+    private var discoveredHost: HostAdvertisement? = null
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         start()
@@ -48,7 +48,8 @@ class SecondScreenClient(
                 onStatus("SecondScreen — connexion…")
                 val s = Socket()
                 s.tcpNoDelay = true
-                s.connect(InetSocketAddress(hostAddress(), hostPort), 1500)
+                val host = discoverHost() ?: throw IllegalStateException("No SecondScreen host found")
+                s.connect(InetSocketAddress(host.address, host.controlPort), 1500)
                 socket = s
                 onStatus("SecondScreen — connecté")
                 consumeVideo(DataInputStream(BufferedInputStream(s.getInputStream())))
@@ -64,11 +65,11 @@ class SecondScreenClient(
         }
     }
 
-    private fun hostAddress(): String {
-        // TODO: LAN discovery + authenticated pairing.
-        // Kept as a single method so discovery can replace it without
-        // changing the decoder pipeline.
-        return "192.168.1.2"
+    private fun discoverHost(): HostAdvertisement? {
+        discoveredHost?.let { return it }
+        val found = DiscoveryClient().discover()
+        discoveredHost = found
+        return found
     }
 
     private fun consumeVideo(input: DataInputStream) {
