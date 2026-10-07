@@ -21,7 +21,8 @@ class ControlClient(private val socket:Socket) {
     fun authenticate(token:String):ControlResult {
         send(0x0A,"{\"sessionToken\":\"" + escape(token) + "\"}")
         val auth=receive() ?: return ControlResult(false)
-        if(auth.type!=0x05) return ControlResult(false)
+        if(auth.type!=0x05 && auth.type!=0x06) return ControlResult(false)
+        if(auth.type==0x06) return ControlResult(true,token,StreamConfig.parse(auth.json))
         val config=runCatching {
             val old=socket.soTimeout
             socket.soTimeout=500
