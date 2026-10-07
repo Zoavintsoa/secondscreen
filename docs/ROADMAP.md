@@ -99,3 +99,13 @@ A checkbox is not marked complete because code exists. It is complete only after
 - A native QUIC JNI boundary is present and deliberately reports unavailable until upstream MsQuic is actually linked and validated; TCP is never mislabeled as QUIC.
 - iPadOS deployment target is 13.0 with availability-safe capability probing for H.264, HEVC, Metal and Pencil.
 - No device-specific manufacturer/model assumptions were introduced.
+
+
+### 2026-10-08 legacy Intel Mac pass
+- [x] Define Catalina/Big Sur compatibility target for old Intel Macs.
+- [x] Lower the macOS host deployment target to macOS 10.15.
+- [x] Add isolated LegacyCapture and VideoToolbox encoder boundaries.
+- [x] Document the rule that Sidecar and private display APIs are never product dependencies.
+- [ ] Implement real Catalina/Big Sur capture and VideoToolbox encoding.
+- [ ] Validate a public/supportable virtual-display mechanism on legacy macOS.
+- [ ] End-to-end validate a real MacBook Pro 2013.
