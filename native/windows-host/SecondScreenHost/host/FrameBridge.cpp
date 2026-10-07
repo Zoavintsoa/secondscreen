@@ -1,22 +1,21 @@
 #include "FrameBridge.h"
 
+#include <utility>
+
 namespace second_screen {
 
 bool FrameBridge::start(FrameCallback callback) {
     callback_ = std::move(callback);
-    return true;
+    return static_cast<bool>(callback_);
 }
 
 void FrameBridge::stop() {
     callback_ = nullptr;
 }
 
-bool FrameBridge::submitGpuFrame(void* d3dTexture, const FrameInfo& info) {
-    if (!d3dTexture || !callback_) {
-        return false;
-    }
-
-    callback_(info);
+bool FrameBridge::submitGpuFrame(ID3D11Texture2D* d3dTexture, const FrameInfo& info) {
+    if (!d3dTexture || !callback_) return false;
+    callback_(d3dTexture, info);
     return true;
 }
 
