@@ -425,6 +425,26 @@ void SwapChainProcessor::RunCore()
             // We have new frame to process, the surface has a reference on it that the driver has to release
             AcquiredBuffer.Attach(Buffer.MetaData.pSurface);
 
+            Microsoft::WRL::ComPtr<ID3D11Texture2D> sourceTexture;
+            if (SUCCEEDED(AcquiredBuffer.As(&sourceTexture))) {
+                D3D11_TEXTURE2D_DESC sourceDesc{};
+                sourceTexture->GetDesc(&sourceDesc);
+                if (!m_FramePublisherInitialized) {
+                    m_FramePublisherInitialized =
+                        m_FramePublisher.initialize(m_Device->Device.Get(), sourceDesc.Width, sourceDesc.Height);
+                }
+                if (m_FramePublisherInitialized) {
+                    LARGE_INTEGER frequency{};
+                    LARGE_INTEGER counter{};
+                    QueryPerformanceFrequency(&frequency);
+                    QueryPerformanceCounter(&counter);
+                    const uint64_t timestampUs = frequency.QuadPart > 0
+                        ? static_cast<uint64_t>((counter.QuadPart * 1000000LL) / frequency.QuadPart)
+                        : 0;
+                    m_FramePublisher.publish(sourceTexture.Get(), timestampUs);
+                }
+            }
+
             // ==============================
             // TODO: Process the frame here
             //
