@@ -22,28 +22,27 @@
 
 namespace second_screen {
 
-#if SECOND_SCREEN_HAS_MSQUIC
-
-struct ConnectionContext;
-
 struct MsQuicServer::Impl {
     Config config;
     quic::TransportCallbacks callbacks;
-
     bool running{false};
     bool connected{false};
     uint16_t maxSendLength{1200};
 
+#if SECOND_SCREEN_HAS_MSQUIC
     const QUIC_API_TABLE* api{nullptr};
     HQUIC registration{nullptr};
     HQUIC configuration{nullptr};
     HQUIC listener{nullptr};
     ConnectionContext* connectionContext{nullptr};
-
     std::mutex stateMutex;
     std::condition_variable stateCv;
+#endif
 };
 
+#if SECOND_SCREEN_HAS_MSQUIC
+
+struct ConnectionContext;
 namespace {
 
 using second_screen::control::ControlFrameParser;
