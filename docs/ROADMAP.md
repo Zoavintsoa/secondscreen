@@ -26,6 +26,7 @@
 - [ ] MsQuic Android transport adapter
 - [ ] Authenticated pairing end-to-end
 - [x] Bounded control-frame parser and framing implementation
+- [x] Transport-neutral control session state machine with host security callbacks
 - [x] QUIC datagram video fragmentation contract
 - [ ] Dynamic STREAM_CONFIG on Android
 - [ ] Keyframe request/recovery
