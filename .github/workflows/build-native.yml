@@ -33,32 +33,18 @@ jobs:
         working-directory: clients/android
         run: gradle assembleDebug
 
-  apple-preflight:
+  apple-build:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify Apple build toolchain
+      - name: Verify Apple toolchain
         run: |
           xcodebuild -version
           xcrun --sdk macosx --show-sdk-path
           xcrun --sdk iphoneos --show-sdk-path
-          xcodebuild -showsdks
-      - name: Verify Apple source layout
-        shell: bash
+      - name: Build macOS host
         run: |
-          test -f native/macos-host/README.md
-          test -f clients/ipados/README.md
-          echo "Apple Xcode targets are reserved until their native projects are added."
-
-  apple-build:
-    if: ${{ hashFiles('native/macos-host/**/*.xcodeproj/**', 'native/macos-host/**/*.xcworkspace/**', 'clients/ipados/**/*.xcodeproj/**', 'clients/ipados/**/*.xcworkspace/**') != '' }}
-    runs-on: macos-latest
-    needs: apple-preflight
-    steps:
-      - uses: actions/checkout@v4
-      - name: Build Apple targets
-        shell: bash
+          xcodebuild             -project native/macos-host/SecondScreenMacHost.xcodeproj             -target SecondScreenMacHost             -configuration Release             -sdk macosx             CODE_SIGNING_ALLOWED=NO             build
+      - name: Build iPadOS client
         run: |
-          set -e
-          find native/macos-host clients/ipados -maxdepth 3 \( -name '*.xcworkspace' -o -name '*.xcodeproj' \) -print
-          echo "Native Apple projects will be built here once present."
+          xcodebuild             -project clients/ipados/SecondScreenIPad.xcodeproj             -target SecondScreenIPad             -configuration Release             -sdk iphoneos             -destination 'generic/platform=iOS'             CODE_SIGNING_ALLOWED=NO             build
