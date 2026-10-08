@@ -79,13 +79,13 @@ private struct ContentView: View {
             .padding(32)
         }
         .sheet(isPresented: $showingAbout) {
-            LegalSheet(title:"À propos de SecondScreen — Zoavintsoa", body: aboutText)
+            LegalSheet(title:"À propos de SecondScreen — Zoavintsoa", textBody: aboutText)
         }
         .sheet(isPresented: $showingTerms) {
-            LegalSheet(title:"Conditions d’utilisation", body: termsText)
+            LegalSheet(title:"Conditions d’utilisation", textBody: termsText)
         }
         .sheet(isPresented: $showingPrivacy) {
-            LegalSheet(title:"Politique de confidentialité", body: privacyText)
+            LegalSheet(title:"Politique de confidentialité", textBody: privacyText)
         }
     }
 
@@ -128,11 +128,11 @@ SecondScreen ne vend pas les données utilisateur et n’ajoute pas d’analytiq
 
 private struct LegalSheet: View {
     let title:String
-    let body:String
+    let textBody:String
 
     var bodyView: some View {
         ScrollView {
-            Text(body)
+            Text(textBody)
                 .frame(maxWidth:.infinity, alignment:.leading)
                 .padding(24)
         }
