@@ -1,0 +1,354 @@
+#import "MacTestStreamBridge.h"
+#import <CoreGraphics/CoreGraphics.h>
+#import <CoreVideo/CoreVideo.h>
+#import <VideoToolbox/VideoToolbox.h>
+#import <IOSurface/IOSurface.h>
+
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
+#include <atomic>
+#include <chrono>
+#include <cstdint>
+#include <cstring>
+#include <mutex>
+#include <thread>
+#include <vector>
+
+namespace {
+constexpr uint16_t kDiscoveryPort = 49151;
+constexpr uint16_t kVideoPort = 49153;
+constexpr int kWidth = 1280;
+constexpr int kHeight = 720;
+constexpr int kFps = 30;
+constexpr int kBitrate = 5 * 1000 * 1000;
+
+struct State {
+    std::atomic<bool> running{false};
+    std::thread discoveryThread;
+    std::thread serverThread;
+    CGDisplayStreamRef stream = nullptr;
+    VTCompressionSessionRef encoder = nullptr;
+    std::mutex socketMutex;
+    int client = -1;
+    std::uint32_t frameId = 0;
+};
+
+State g;
+
+bool sendAll(int fd, const std::uint8_t* data, size_t size) {
+    while (size > 0) {
+        const ssize_t n = send(fd, data, size, MSG_NOSIGNAL);
+        if (n <= 0) return false;
+        data += n;
+        size -= static_cast<size_t>(n);
+    }
+    return true;
+}
+
+void putU16(std::vector<std::uint8_t>& b, std::uint16_t v) {
+    b.push_back(static_cast<std::uint8_t>(v >> 8));
+    b.push_back(static_cast<std::uint8_t>(v));
+}
+void putU32(std::vector<std::uint8_t>& b, std::uint32_t v) {
+    b.push_back(static_cast<std::uint8_t>(v >> 24));
+    b.push_back(static_cast<std::uint8_t>(v >> 16));
+    b.push_back(static_cast<std::uint8_t>(v >> 8));
+    b.push_back(static_cast<std::uint8_t>(v));
+}
+void putU64(std::vector<std::uint8_t>& b, std::uint64_t v) {
+    for (int i = 7; i >= 0; --i) b.push_back(static_cast<std::uint8_t>(v >> (i * 8)));
+}
+void putStartCode(std::vector<std::uint8_t>& b) {
+    b.push_back(0); b.push_back(0); b.push_back(0); b.push_back(1);
+}
+
+bool isKeyframe(CMSampleBufferRef sample) {
+    CFArrayRef attachments = CMSampleBufferGetSampleAttachmentsArray(sample, false);
+    if (!attachments || CFArrayGetCount(attachments) == 0) return true;
+    auto dict = static_cast<CFDictionaryRef>(CFArrayGetValueAtIndex(attachments, 0));
+    if (!dict) return true;
+    auto notSync = static_cast<CFBooleanRef>(
+        CFDictionaryGetValue(dict, kCMSampleAttachmentKey_NotSync));
+    return !(notSync && CFBooleanGetValue(notSync));
+}
+
+std::vector<std::uint8_t> annexBFromSample(CMSampleBufferRef sample, bool keyframe) {
+    std::vector<std::uint8_t> out;
+
+    if (keyframe) {
+        CMVideoFormatDescriptionRef format =
+            CMSampleBufferGetFormatDescription(sample);
+        if (format) {
+            for (size_t i = 0; i < 2; ++i) {
+                const std::uint8_t* parameterSet = nullptr;
+                size_t parameterSetSize = 0;
+                size_t parameterSetCount = 0;
+                int nalHeaderLength = 0;
+                if (CMVideoFormatDescriptionGetH264ParameterSetAtIndex(
+                        format, i, &parameterSet, &parameterSetSize,
+                        &parameterSetCount, &nalHeaderLength) == noErr &&
+                    parameterSet && parameterSetSize > 0) {
+                    putStartCode(out);
+                    out.insert(out.end(), parameterSet, parameterSet + parameterSetSize);
+                }
+            }
+        }
+    }
+
+    CMBlockBufferRef block = CMSampleBufferGetDataBuffer(sample);
+    if (!block) return {};
+    size_t length = 0;
+    char* data = nullptr;
+    if (CMBlockBufferGetDataPointer(block, 0, nullptr, &length, &data) != kCMBlockBufferNoErr ||
+        !data) return {};
+
+    size_t offset = 0;
+    while (offset + 4 <= length) {
+        std::uint32_t nalLength =
+            (static_cast<std::uint8_t>(data[offset]) << 24) |
+            (static_cast<std::uint8_t>(data[offset + 1]) << 16) |
+            (static_cast<std::uint8_t>(data[offset + 2]) << 8) |
+            static_cast<std::uint8_t>(data[offset + 3]);
+        offset += 4;
+        if (nalLength == 0 || offset + nalLength > length) return {};
+        putStartCode(out);
+        out.insert(out.end(),
+                   reinterpret_cast<std::uint8_t*>(data) + offset,
+                   reinterpret_cast<std::uint8_t*>(data) + offset + nalLength);
+        offset += nalLength;
+    }
+    return out;
+}
+
+void encoderCallback(void* refcon,
+                     void* sourceFrameRefcon,
+                     OSStatus status,
+                     VTEncodeInfoFlags infoFlags,
+                     CMSampleBufferRef sample) {
+    (void)refcon;
+    (void)sourceFrameRefcon;
+    (void)infoFlags;
+    if (status != noErr || !sample || !CMSampleBufferDataIsReady(sample) || !g.running.load())
+        return;
+
+    const bool keyframe = isKeyframe(sample);
+    auto payload = annexBFromSample(sample, keyframe);
+    if (payload.empty() || payload.size() > 16 * 1024 * 1024) return;
+
+    const auto pts = CMSampleBufferGetPresentationTimeStamp(sample);
+    const std::uint64_t timestampUs =
+        pts.timescale > 0 ? static_cast<std::uint64_t>(
+            (static_cast<double>(pts.value) / pts.timescale) * 1000000.0) : 0;
+
+    std::vector<std::uint8_t> frame;
+    frame.reserve(20 + payload.size());
+    frame.push_back('S'); frame.push_back('S'); frame.push_back('V'); frame.push_back('F');
+    frame.push_back(1); // H.264
+    frame.push_back(keyframe ? 1 : 0);
+    putU16(frame, 0);
+    putU64(frame, timestampUs);
+    putU32(frame, static_cast<std::uint32_t>(payload.size()));
+    frame.insert(frame.end(), payload.begin(), payload.end());
+
+    std::lock_guard<std::mutex> lock(g.socketMutex);
+    if (g.client >= 0 && !sendAll(g.client, frame.data(), frame.size())) {
+        close(g.client);
+        g.client = -1;
+    }
+    ++g.frameId;
+}
+
+void discoveryLoop() {
+    const int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd < 0) return;
+
+    int yes = 1;
+    setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes));
+
+    sockaddr_in destination{};
+    destination.sin_family = AF_INET;
+    destination.sin_port = htons(kDiscoveryPort);
+    destination.sin_addr.s_addr = htonl(INADDR_BROADCAST);
+
+    const char payload[] =
+        "{\"service\":\"secondscreen\",\"name\":\"SecondScreen iMac\","
+        "\"mode\":\"test\",\"controlPort\":49152,\"videoPort\":49153,"
+        "\"width\":1280,\"height\":720,\"fps\":30}";
+
+    while (g.running.load()) {
+        sendto(fd, payload, sizeof(payload) - 1, 0,
+               reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+    close(fd);
+}
+
+void serverLoop() {
+    const int listener = socket(AF_INET, SOCK_STREAM, 0);
+    if (listener < 0) return;
+
+    int yes = 1;
+    setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+
+    sockaddr_in address{};
+    address.sin_family = AF_INET;
+    address.sin_port = htons(kVideoPort);
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    if (bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0 ||
+        listen(listener, 1) < 0) {
+        close(listener);
+        return;
+    }
+
+    while (g.running.load()) {
+        sockaddr_in peer{};
+        socklen_t peerLength = sizeof(peer);
+        const int client = accept(listener, reinterpret_cast<sockaddr*>(&peer), &peerLength);
+        if (client < 0) {
+            if (!g.running.load()) break;
+            continue;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock(g.socketMutex);
+            if (g.client >= 0) close(g.client);
+            g.client = client;
+        }
+
+        while (g.running.load()) {
+            char byte;
+            const ssize_t n = recv(client, &byte, 1, MSG_PEEK);
+            if (n == 0 || (n < 0 && errno != EAGAIN && errno != EINTR)) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+        }
+
+        std::lock_guard<std::mutex> lock(g.socketMutex);
+        if (g.client == client) {
+            close(g.client);
+            g.client = -1;
+        } else {
+            close(client);
+        }
+    }
+
+    close(listener);
+}
+
+bool startEncoder() {
+    if (VTCompressionSessionCreate(kCFAllocatorDefault, kWidth, kHeight,
+                                    kCMVideoCodecType_H264, nullptr, nullptr,
+                                    nullptr, encoderCallback, nullptr, &g.encoder) != noErr ||
+        !g.encoder) {
+        return false;
+    }
+
+    const int32_t bitrate = kBitrate;
+    const int32_t fps = kFps;
+    const int32_t keyInterval = kFps;
+
+    VTSessionSetProperty(g.encoder, kVTCompressionPropertyKey_RealTime, kCFBooleanTrue);
+
+    CFNumberRef bitrateRef = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &bitrate);
+    CFNumberRef fpsRef = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &fps);
+    CFNumberRef keyRef = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &keyInterval);
+
+    if (bitrateRef) {
+        VTSessionSetProperty(g.encoder, kVTCompressionPropertyKey_AverageBitRate, bitrateRef);
+        CFRelease(bitrateRef);
+    }
+    if (fpsRef) {
+        VTSessionSetProperty(g.encoder, kVTCompressionPropertyKey_ExpectedFrameRate, fpsRef);
+        CFRelease(fpsRef);
+    }
+    if (keyRef) {
+        VTSessionSetProperty(g.encoder, kVTCompressionPropertyKey_MaxKeyFrameInterval, keyRef);
+        CFRelease(keyRef);
+    }
+
+    VTSessionSetProperty(g.encoder, kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanFalse);
+    return VTCompressionSessionPrepareToEncodeFrames(g.encoder) == noErr;
+}
+
+void startCapture() {
+    const CGDirectDisplayID display = CGMainDisplayID();
+    CFNumberRef frameTime = CFNumberCreate(kCFAllocatorDefault, kCFNumberDoubleType,
+                                           &(double){1.0 / kFps});
+    const void* keys[] = {kCGDisplayStreamMinimumFrameTime};
+    const void* values[] = {frameTime};
+    CFDictionaryRef properties = CFDictionaryCreate(
+        kCFAllocatorDefault, keys, values, 1,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    if (frameTime) CFRelease(frameTime);
+
+    g.stream = CGDisplayStreamCreateWithDispatchQueue(
+        display, kWidth, kHeight, kCVPixelFormatType_32BGRA, properties,
+        dispatch_get_global_queue(QOS_CLASS_USER_INTERACTIVE, 0),
+        ^(CGDisplayStreamFrameStatus status, uint64_t displayTime, IOSurfaceRef frameSurface,
+          CGDisplayStreamUpdateRef updateRef) {
+            (void)updateRef;
+            if (status != kCGDisplayStreamFrameStatusFrameComplete || !frameSurface ||
+                !g.encoder || !g.running.load()) return;
+
+            CVPixelBufferRef pixelBuffer = nullptr;
+            if (CVPixelBufferCreateWithIOSurface(kCFAllocatorDefault, frameSurface, nullptr,
+                                                 &pixelBuffer) != kCVReturnSuccess ||
+                !pixelBuffer) return;
+
+            CMTime pts = CMTimeMake(static_cast<int64_t>(displayTime), 1000000000);
+            VTEncodeInfoFlags flags = 0;
+            VTCompressionSessionEncodeFrame(g.encoder, pixelBuffer, pts,
+                                            CMTimeMake(1, kFps), nullptr, nullptr, &flags);
+            CVPixelBufferRelease(pixelBuffer);
+        });
+
+    if (properties) CFRelease(properties);
+    if (g.stream) CGDisplayStreamStart(g.stream);
+}
+
+} // namespace
+
+extern "C" void SecondScreenStartTestStream(void) {
+    if (g.running.exchange(true)) return;
+
+    if (!startEncoder()) {
+        g.running = false;
+        return;
+    }
+
+    g.discoveryThread = std::thread(discoveryLoop);
+    g.serverThread = std::thread(serverLoop);
+    startCapture();
+}
+
+extern "C" void SecondScreenStopTestStream(void) {
+    if (!g.running.exchange(false)) return;
+
+    if (g.stream) {
+        CGDisplayStreamStop(g.stream);
+        CFRelease(g.stream);
+        g.stream = nullptr;
+    }
+    if (g.encoder) {
+        VTCompressionSessionCompleteFrames(g.encoder, kCMTimeInvalid);
+        VTCompressionSessionInvalidate(g.encoder);
+        CFRelease(g.encoder);
+        g.encoder = nullptr;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g.socketMutex);
+        if (g.client >= 0) {
+            shutdown(g.client, SHUT_RDWR);
+            close(g.client);
+            g.client = -1;
+        }
+    }
+
+    if (g.discoveryThread.joinable()) g.discoveryThread.join();
+    if (g.serverThread.joinable()) g.serverThread.join();
+}
