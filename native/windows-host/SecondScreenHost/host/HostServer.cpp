@@ -79,11 +79,26 @@ bool HostServer::start() {
     }
 
     if (!frameBridge_.start([this](ID3D11Texture2D* texture, const FrameInfo& info){ onFrame(texture, info); })) {
-        videoStream_.stop(); controlServer_->stop(); controlServer_.reset(); discovery_.stop(); WSACleanup(); running_=false; return false;
+        if (quicServer_) { quicServer_->stop(); quicServer_.reset(); }
+        videoStream_.stop();
+        controlServer_->stop();
+        controlServer_.reset();
+        discovery_.stop();
+        WSACleanup();
+        running_ = false;
+        return false;
     }
 
     if (!frameReceiver_.start(this)) {
-        frameBridge_.stop(); videoStream_.stop(); controlServer_->stop(); controlServer_.reset(); discovery_.stop(); WSACleanup(); running_=false; return false;
+        frameBridge_.stop();
+        if (quicServer_) { quicServer_->stop(); quicServer_.reset(); }
+        videoStream_.stop();
+        controlServer_->stop();
+        controlServer_.reset();
+        discovery_.stop();
+        WSACleanup();
+        running_ = false;
+        return false;
     }
     return true;
 }
