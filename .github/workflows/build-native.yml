@@ -25,6 +25,21 @@ jobs:
           $msbuild = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
           if (-not $msbuild) { throw "MSBuild not found" }
           & $msbuild native/windows-host/SecondScreenHost/SecondScreenHost.vcxproj /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot="$env:VCPKG_ROOT" /p:VcpkgInstalledDir="$env:GITHUB_WORKSPACE\vcpkg_installed\x64-windows\"
+      - name: Package Windows host
+        shell: pwsh
+        run: |
+          $out = "$env:GITHUB_WORKSPACE\artifacts\windows"
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $exe = Get-ChildItem -Path "$env:GITHUB_WORKSPACE\native\windows-host" -Filter SecondScreenHost.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { throw "SecondScreenHost.exe not found" }
+          Copy-Item $exe.FullName "$out\SecondScreenHost.exe"
+          Compress-Archive -Path "$out\SecondScreenHost.exe" -DestinationPath "$env:GITHUB_WORKSPACE\SecondScreen-Windows.zip" -Force
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecondScreen-Windows
+          path: SecondScreen-Windows.zip
+          if-no-files-found: error
 
   android-client:
     runs-on: ubuntu-latest
@@ -46,6 +61,19 @@ jobs:
       - name: Build Android
         working-directory: clients/android
         run: gradle assembleDebug
+      - name: Package Android APK
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/android"
+          APK="$(find "$GITHUB_WORKSPACE/clients/android/build/outputs/apk" -type f -name '*.apk' | head -n 1)"
+          test -n "$APK"
+          cp "$APK" "$GITHUB_WORKSPACE/artifacts/android/SecondScreen-Android.apk"
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecondScreen-Android
+          path: artifacts/android/SecondScreen-Android.apk
+          if-no-files-found: error
 
   apple-build:
     runs-on: macos-latest
@@ -59,6 +87,30 @@ jobs:
       - name: Build macOS host
         run: |
           xcodebuild -project native/macos-host/SecondScreenMacHost.xcodeproj -target SecondScreenMacHost -configuration Release -sdk macosx CODE_SIGNING_ALLOWED=NO build
+      - name: Package macOS host
+        run: |
+          set -euo pipefail
+          APP="$(find "$GITHUB_WORKSPACE" -type d -path '*/Build/Products/Release/SecondScreenMacHost.app' -print -quit)"
+          test -n "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$GITHUB_WORKSPACE/SecondScreen-macOS.zip"
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecondScreen-macOS
+          path: SecondScreen-macOS.zip
+          if-no-files-found: error
       - name: Build iPadOS client
         run: |
           xcodebuild -project clients/ipados/SecondScreenIPad.xcodeproj -target SecondScreenIPad -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
+      - name: Package iPadOS client
+        run: |
+          set -euo pipefail
+          APP="$(find "$GITHUB_WORKSPACE" -type d -path '*/Build/Products/Release-iphoneos/SecondScreenIPad.app' -print -quit)"
+          test -n "$APP"
+          ditto -c -k --sequesterRsrc --keepParent "$APP" "$GITHUB_WORKSPACE/SecondScreen-iPadOS.zip"
+      - name: Upload iPadOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecondScreen-iPadOS
+          path: SecondScreen-iPadOS.zip
+          if-no-files-found: error
