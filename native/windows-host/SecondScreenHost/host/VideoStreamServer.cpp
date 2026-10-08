@@ -68,9 +68,18 @@ void VideoStreamServer::stop(){
     if(!running_.exchange(false)) return;
     authorized_=false;
     if(listenSocket_!=INVALID_SOCKET){closesocket(listenSocket_);listenSocket_=INVALID_SOCKET;}
-    std::lock_guard lock(socketMutex_);
-    if(clientSocket_!=INVALID_SOCKET){closesocket(clientSocket_);clientSocket_=INVALID_SOCKET;}
-    clientConnected_=false;
+    {
+        std::lock_guard lock(socketMutex_);
+        if(clientSocket_!=INVALID_SOCKET){
+            shutdown(clientSocket_, SD_BOTH);
+            closesocket(clientSocket_);
+            clientSocket_=INVALID_SOCKET;
+        }
+        clientConnected_=false;
+    }
+
+    // Join outside socketMutex_: acceptLoop may need the same mutex after
+    // accept() is interrupted by the listen socket close.
     if(acceptThread_&&acceptThread_->joinable()) acceptThread_->join();
     acceptThread_.reset();
 }
