@@ -53,7 +53,7 @@ void VideoStreamServer::sendFrame(const std::vector<uint8_t>& annexB,bool keyFra
     frame.push_back(0); frame.push_back(0);
     for(int i=7;i>=0;--i) frame.push_back(static_cast<uint8_t>(timestampUs>>(i*8)));
     const uint32_t length=static_cast<uint32_t>(annexB.size());
-    frame.push_back(length>>24); frame.push_back(length>>16); frame.push_back(length>>8); frame.push_back(length);
+    frame.push_back(static_cast<uint8_t>(length >> 24)); frame.push_back(static_cast<uint8_t>(length >> 16)); frame.push_back(static_cast<uint8_t>(length >> 8)); frame.push_back(static_cast<uint8_t>(length));
     frame.insert(frame.end(),annexB.begin(),annexB.end());
 
     std::lock_guard lock(socketMutex_);
