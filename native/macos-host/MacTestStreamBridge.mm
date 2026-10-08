@@ -1,4 +1,5 @@
 #import "MacTestStreamBridge.h"
+#import "MacUsbAccessoryBridge.h"
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreVideo/CoreVideo.h>
 #import <VideoToolbox/VideoToolbox.h>
@@ -159,11 +160,16 @@ void encoderCallback(void* refcon,
     putU32(frame, static_cast<std::uint32_t>(payload.size()));
     frame.insert(frame.end(), payload.begin(), payload.end());
 
-    std::lock_guard<std::mutex> lock(g.socketMutex);
-    if (g.client >= 0 && !sendAll(g.client, frame.data(), frame.size())) {
-        close(g.client);
-        g.client = -1;
+    {
+        std::lock_guard<std::mutex> lock(g.socketMutex);
+        if (g.client >= 0 && !sendAll(g.client, frame.data(), frame.size())) {
+            close(g.client);
+            g.client = -1;
+        }
     }
+    // USB is an additional transport. A connected Android accessory receives the
+    // exact same SSVF frame, so decoding/recovery stays identical across LAN/USB.
+    SecondScreenUsbAccessorySend(frame.data(), frame.size());
     ++g.frameId;
 }
 
@@ -427,6 +433,7 @@ extern "C" void SecondScreenStartTestStream(void) {
 
     g.discoveryThread = std::thread(discoveryLoop);
     g.serverThread = std::thread(serverLoop);
+    SecondScreenStartUsbAccessory();
     startCapture();
 
     if (!g.stream) {
@@ -468,6 +475,7 @@ extern "C" void SecondScreenStopTestStream(void) {
         }
     }
 
+    SecondScreenStopUsbAccessory();
     if (g.discoveryThread.joinable()) g.discoveryThread.join();
     if (g.serverThread.joinable()) g.serverThread.join();
 }
