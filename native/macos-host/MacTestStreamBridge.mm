@@ -3,9 +3,11 @@
 #import <CoreVideo/CoreVideo.h>
 #import <VideoToolbox/VideoToolbox.h>
 #import <IOSurface/IOSurface.h>
+#import <os/log.h>
 
 #include <arpa/inet.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -38,6 +40,7 @@ struct State {
 };
 
 State g;
+os_log_t gLog = os_log_create("com.zoavintsoa.secondscreen", "TestStream");
 
 bool sendAll(int fd, const std::uint8_t* data, size_t size) {
     while (size > 0) {
@@ -193,17 +196,25 @@ void serverLoop() {
 
     int yes = 1;
     setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
+    const int flags = fcntl(listener, F_GETFL, 0);
+    if (flags >= 0) fcntl(listener, F_SETFL, flags | O_NONBLOCK);
 
     sockaddr_in address{};
     address.sin_family = AF_INET;
     address.sin_port = htons(kVideoPort);
     address.sin_addr.s_addr = htonl(INADDR_ANY);
 
-    if (bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0 ||
-        listen(listener, 1) < 0) {
+    if (bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
+        os_log_error(gLog, "Video TCP bind failed: %{public}d", errno);
         close(listener);
         return;
     }
+    if (listen(listener, 1) < 0) {
+        os_log_error(gLog, "Video TCP listen failed: %{public}d", errno);
+        close(listener);
+        return;
+    }
+    os_log(gLog, "Video TCP server listening on %{public}d", kVideoPort);
 
     while (g.running.load()) {
         sockaddr_in peer{};
@@ -211,8 +222,14 @@ void serverLoop() {
         const int client = accept(listener, reinterpret_cast<sockaddr*>(&peer), &peerLength);
         if (client < 0) {
             if (!g.running.load()) break;
+            if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+                continue;
+            }
+            os_log_error(gLog, "Video TCP accept failed: %{public}d", errno);
             continue;
         }
+        os_log(gLog, "Android video client connected");
 
         {
             std::lock_guard<std::mutex> lock(g.socketMutex);
@@ -240,10 +257,12 @@ void serverLoop() {
 }
 
 bool startEncoder() {
-    if (VTCompressionSessionCreate(kCFAllocatorDefault, kWidth, kHeight,
-                                    kCMVideoCodecType_H264, nullptr, nullptr,
-                                    nullptr, encoderCallback, nullptr, &g.encoder) != noErr ||
-        !g.encoder) {
+    os_log(gLog, "Starting VideoToolbox H.264 encoder");
+    const OSStatus createStatus = VTCompressionSessionCreate(
+        kCFAllocatorDefault, kWidth, kHeight, kCMVideoCodecType_H264,
+        nullptr, nullptr, nullptr, encoderCallback, nullptr, &g.encoder);
+    if (createStatus != noErr || !g.encoder) {
+        os_log_error(gLog, "VTCompressionSessionCreate failed: %{public}d", (int)createStatus);
         return false;
     }
 
@@ -271,10 +290,20 @@ bool startEncoder() {
     }
 
     VTSessionSetProperty(g.encoder, kVTCompressionPropertyKey_AllowFrameReordering, kCFBooleanFalse);
-    return VTCompressionSessionPrepareToEncodeFrames(g.encoder) == noErr;
+    const OSStatus prepareStatus = VTCompressionSessionPrepareToEncodeFrames(g.encoder);
+    if (prepareStatus != noErr) {
+        os_log_error(gLog, "VTCompressionSessionPrepareToEncodeFrames failed: %{public}d", (int)prepareStatus);
+        VTCompressionSessionInvalidate(g.encoder);
+        CFRelease(g.encoder);
+        g.encoder = nullptr;
+        return false;
+    }
+    os_log(gLog, "VideoToolbox encoder ready");
+    return true;
 }
 
 void startCapture() {
+    os_log(gLog, "Starting CGDisplayStream");
     const CGDirectDisplayID display = CGMainDisplayID();
     const double minimumFrameTime = 1.0 / kFps;
     CFNumberRef frameTime = CFNumberCreate(kCFAllocatorDefault, kCFNumberDoubleType,
@@ -308,13 +337,28 @@ void startCapture() {
         });
 
     if (properties) CFRelease(properties);
-    if (g.stream) CGDisplayStreamStart(g.stream);
+    if (!g.stream) {
+        os_log_error(gLog, "CGDisplayStreamCreateWithDispatchQueue returned null");
+        return;
+    }
+    const CGError startStatus = CGDisplayStreamStart(g.stream);
+    os_log(gLog, "CGDisplayStreamStart returned: %{public}d", (int)startStatus);
 }
 
 } // namespace
 
 extern "C" void SecondScreenStartTestStream(void) {
     if (g.running.exchange(true)) return;
+
+    os_log(gLog, "SecondScreenStartTestStream");
+
+    if (!CGPreflightScreenCaptureAccess()) {
+        os_log(gLog, "Screen Recording permission is not granted; requesting access");
+        const bool requested = CGRequestScreenCaptureAccess();
+        os_log(gLog, "CGRequestScreenCaptureAccess returned: %{public}s", requested ? "true" : "false");
+        g.running = false;
+        return;
+    }
 
     if (!startEncoder()) {
         g.running = false;
@@ -324,6 +368,20 @@ extern "C" void SecondScreenStartTestStream(void) {
     g.discoveryThread = std::thread(discoveryLoop);
     g.serverThread = std::thread(serverLoop);
     startCapture();
+
+    if (!g.stream) {
+        os_log_error(gLog, "Test stream aborted: display capture could not be created");
+        g.running = false;
+        if (g.discoveryThread.joinable()) g.discoveryThread.join();
+        if (g.serverThread.joinable()) g.serverThread.join();
+        if (g.encoder) {
+            VTCompressionSessionInvalidate(g.encoder);
+            CFRelease(g.encoder);
+            g.encoder = nullptr;
+        }
+    } else {
+        os_log(gLog, "SecondScreen test stream is running");
+    }
 }
 
 extern "C" void SecondScreenStopTestStream(void) {
