@@ -11,11 +11,12 @@ class VideoStreamDecoder(private val surface:SurfaceHolder) {
     private var height=0
 
     fun decode(codec:Int,w:Int,h:Int,accessUnit:ByteArray,timestampUs:Long,keyFrame:Boolean) {
-        if(decoder==null || codecId!=codec || width!=w || height!=h) configure(codec,w,h)
+        if(decoder==null || codecId!=codec || width!=w || height!=h) runCatching { configure(codec,w,h) }.getOrElse { return }
         val d=decoder ?: return
         val index=d.dequeueInputBuffer(10_000)
         if(index>=0) {
             val buffer=d.getInputBuffer(index) ?: return
+            if(accessUnit.size > buffer.capacity()) { requestReconfigure(codec,w,h); return }
             buffer.clear();buffer.put(accessUnit)
             d.queueInputBuffer(index,0,accessUnit.size,timestampUs.coerceAtLeast(0L),
                 if(keyFrame) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0)
