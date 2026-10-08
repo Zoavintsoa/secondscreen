@@ -10,7 +10,8 @@ namespace second_screen {
 DriverFrameReceiver::~DriverFrameReceiver() { stop(); }
 
 bool DriverFrameReceiver::start(HostServer* host) {
-    if (!host || running_.exchange(true)) return true;
+    if (!host) return false;
+    if (running_.exchange(true)) return true;
     host_ = host;
     thread_ = std::make_unique<std::thread>(&DriverFrameReceiver::run, this);
     return true;
