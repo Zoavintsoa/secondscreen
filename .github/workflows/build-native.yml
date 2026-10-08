@@ -106,7 +106,7 @@ jobs:
       - name: Package iPadOS client
         run: |
           set -euo pipefail
-          APP="$(find "$GITHUB_WORKSPACE" -type d -path '*/build/Release-iphoneos/SecondScreenIPad.app' -print -quit)"
+          APP="$(find "$GITHUB_WORKSPACE" -type d -path '*/build/Debug-iphoneos/SecondScreenIPad.app' -print -quit)"
           test -n "$APP"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$GITHUB_WORKSPACE/SecondScreen-iPadOS.zip"
       - name: Upload iPadOS artifact
