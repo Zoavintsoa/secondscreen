@@ -38,7 +38,7 @@
     B1000000000000000000001D = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
     B1000000000000000000001E = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOSurface.framework; path = System/Library/Frameworks/IOSurface.framework; sourceTree = SDKROOT; };
     B1000000000000000000001F = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ../MacUsbAccessoryBridge.mm; sourceTree = "<group>"; };
-    B10000000000000000000020 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ../MacUsbAccessoryBridge.h; sourceTree = "<group>"; };
+    B10000000000000000000021 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ../MacUsbAccessoryBridge.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -47,7 +47,7 @@
 
 /* Begin PBXGroup section */
     B10000000000000000000030 = {isa = PBXGroup; children = (B10000000000000000000031, B10000000000000000000032, B10000000000000000000033,); sourceTree = "<group>"; };
-    B10000000000000000000031 = {isa = PBXGroup; children = (B10000000000000000000011, B10000000000000000000012, B10000000000000000000013, B10000000000000000000014, B10000000000000000000015, B10000000000000000000016, B1000000000000000000001A, B1000000000000000000001B, B1000000000000000000001C, B1000000000000000000001F, B10000000000000000000020,); path = SecondScreenMacHost; sourceTree = "<group>"; };
+    B10000000000000000000031 = {isa = PBXGroup; children = (B10000000000000000000011, B10000000000000000000012, B10000000000000000000013, B10000000000000000000014, B10000000000000000000015, B10000000000000000000016, B1000000000000000000001A, B1000000000000000000001B, B1000000000000000000001C, B1000000000000000000001F, B10000000000000000000021,); path = SecondScreenMacHost; sourceTree = "<group>"; };
     B10000000000000000000032 = {isa = PBXGroup; children = (B10000000000000000000010,); name = Products; sourceTree = "<group>"; };
     B10000000000000000000033 = {isa = PBXGroup; children = (B10000000000000000000017, B10000000000000000000018, B10000000000000000000019, B1000000000000000000001D, B1000000000000000000001E,); name = Frameworks; sourceTree = "<group>"; };
 /* End PBXGroup section */
@@ -66,7 +66,7 @@
 
 /* Begin XCBuildConfiguration section */
     B10000000000000000000070 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; OTHER_LDFLAGS = "-framework IOKit"; CODE_SIGNING_ALLOWED = NO; SWIFT_OBJC_BRIDGING_HEADER = "SecondScreenMacHost/SecondScreenMacHost-Bridging-Header.h"; INFOPLIST_FILE = SecondScreenMacHost/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.machost; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; MACOSX_DEPLOYMENT_TARGET = 10.15; }; name = Debug; };
-    B10000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; CODE_SIGNING_ALLOWED = NO; SWIFT_OBJC_BRIDGING_HEADER = "SecondScreenMacHost/SecondScreenMacHost-Bridging-Header.h"; INFOPLIST_FILE = SecondScreenMacHost/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.machost; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; MACOSX_DEPLOYMENT_TARGET = 10.15; }; name = Release; };
+    B10000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; OTHER_LDFLAGS = "-framework IOKit"; CODE_SIGNING_ALLOWED = NO; SWIFT_OBJC_BRIDGING_HEADER = "SecondScreenMacHost/SecondScreenMacHost-Bridging-Header.h"; INFOPLIST_FILE = SecondScreenMacHost/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.machost; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; MACOSX_DEPLOYMENT_TARGET = 10.15; }; name = Release; };
     B10000000000000000000072 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Debug; };
     B10000000000000000000073 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Release; };
 /* End XCBuildConfiguration section */
