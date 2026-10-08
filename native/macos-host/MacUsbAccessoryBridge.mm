@@ -1,5 +1,6 @@
 #import "MacUsbAccessoryBridge.h"
 #include <IOKit/IOKitLib.h>
+#include <IOKit/IOCFPlugIn.h>
 #include <IOKit/usb/IOUSBLib.h>
 #include <IOKit/usb/USB.h>
 #include <CoreFoundation/CoreFoundation.h>
@@ -38,13 +39,13 @@ os_log_t gLog = os_log_create("com.zoavintsoa.secondscreen", "USB");
 
 void releaseAccessoryLocked() {
     if (g.iface) {
-        g.iface->USBInterfaceClose(g.iface);
-        g.iface->Release(g.iface);
+        (*g.iface)->USBInterfaceClose(g.iface);
+        (*g.iface)->Release(g.iface);
         g.iface = nullptr;
     }
     if (g.device) {
-        g.device->USBDeviceClose(g.device);
-        g.device->Release(g.device);
+        g.(*device)->USBDeviceClose(g.device);
+        g.(*device)->Release(g.device);
         g.device = nullptr;
     }
     g.inPipe = g.outPipe = 0;
@@ -61,9 +62,7 @@ bool deviceRequest(IOUSBDeviceInterface182** device, UInt8 type, UInt8 request,
     req.wLength = length;
     req.pData = data;
     req.wLenDone = 0;
-    req.completionTimeout = 1000;
-    req.noDataTimeout = 1000;
-    return device->DeviceRequestTO(device, &req) == kIOReturnSuccess;
+    return (*device)->DeviceRequestTO(device, reinterpret_cast<IOUSBDevRequestTO*>(&req)) == kIOReturnSuccess;
 }
 
 bool sendString(IOUSBDeviceInterface182** device, UInt16 id, const char* value) {
@@ -110,14 +109,14 @@ bool openAccessoryDevice(io_service_t service) {
     IOUSBDeviceInterface182** device = nullptr;
     if (!createDeviceInterface(service, &device)) return false;
     UInt16 vendor = 0, product = 0;
-    if (device->GetDeviceVendor(device, &vendor) != kIOReturnSuccess ||
-        device->GetDeviceProduct(device, &product) != kIOReturnSuccess ||
+    if ((*device)->GetDeviceVendor(device, &vendor) != kIOReturnSuccess ||
+        (*device)->GetDeviceProduct(device, &product) != kIOReturnSuccess ||
         vendor != kGoogleVendor || (product != kAccessoryPid && product != kAccessoryAdbPid)) {
-        device->Release(device); return false;
+        (*device)->Release(device); return false;
     }
-    if (device->USBDeviceOpenSeize(device) != kIOReturnSuccess ||
-        device->SetConfiguration(device, 1) != kIOReturnSuccess) {
-        device->USBDeviceClose(device); device->Release(device); return false;
+    if ((*device)->USBDeviceOpenSeize(device) != kIOReturnSuccess ||
+        (*device)->SetConfiguration(device, 1) != kIOReturnSuccess) {
+        (*device)->USBDeviceClose(device); (*device)->Release(device); return false;
     }
     io_iterator_t iterator = IO_OBJECT_NULL;
     IOUSBFindInterfaceRequest interfaceRequest{};
@@ -125,35 +124,35 @@ bool openAccessoryDevice(io_service_t service) {
     interfaceRequest.bInterfaceSubClass = kIOUSBFindInterfaceDontCare;
     interfaceRequest.bInterfaceProtocol = kIOUSBFindInterfaceDontCare;
     interfaceRequest.bAlternateSetting = kIOUSBFindInterfaceDontCare;
-    if (device->CreateInterfaceIterator(device, &interfaceRequest, &iterator) != kIOReturnSuccess) {
-        device->USBDeviceClose(device); device->Release(device); return false;
+    if ((*device)->CreateInterfaceIterator(device, &interfaceRequest, &iterator) != kIOReturnSuccess) {
+        (*device)->USBDeviceClose(device); (*device)->Release(device); return false;
     }
     IOUSBInterfaceInterface182** chosen = nullptr; UInt8 inPipe = 0, outPipe = 0;
     while (io_service_t intfService = IOIteratorNext(iterator)) {
         IOUSBInterfaceInterface182** candidate = nullptr;
         if (createInterface(intfService, &candidate)) {
             UInt8 count = 0;
-            if (candidate->GetNumEndpoints(candidate, &count) == kIOReturnSuccess) {
+            if ((*candidate)->GetNumEndpoints(candidate, &count) == kIOReturnSuccess) {
                 UInt8 cin = 0, cout = 0;
                 for (UInt8 pipe = 1; pipe <= count; ++pipe) {
                     UInt8 direction = 0, number = 0, type = 0, interval = 0; UInt16 packet = 0;
-                    if (candidate->GetPipeProperties(candidate, pipe, &direction, &number, &type,
+                    if ((*candidate)->GetPipeProperties(candidate, pipe, &direction, &number, &type,
                                                      &packet, &interval) != kIOReturnSuccess) continue;
                     if (type != kUSBBulk) continue;
                     if (direction == kUSBIn && !cin) cin = pipe;
                     if (direction == kUSBOut && !cout) cout = pipe;
                 }
-                if (cin && cout && candidate->USBInterfaceOpenSeize(candidate) == kIOReturnSuccess) {
+                if (cin && cout && (*candidate)->USBInterfaceOpenSeize(candidate) == kIOReturnSuccess) {
                     chosen = candidate; inPipe = cin; outPipe = cout; break;
                 }
             }
         }
-        if (candidate && candidate != chosen) candidate->Release(candidate);
+        if (candidate && candidate != chosen) (*candidate)->Release(candidate);
         IOObjectRelease(intfService);
     }
     IOObjectRelease(iterator);
     if (!chosen) {
-        device->USBDeviceClose(device); device->Release(device); return false;
+        (*device)->USBDeviceClose(device); (*device)->Release(device); return false;
     }
     std::lock_guard<std::mutex> lock(g.mutex);
     releaseAccessoryLocked();
@@ -171,10 +170,10 @@ bool findAccessory(io_service_t* result) {
         IOUSBDeviceInterface182** device = nullptr; bool match = false;
         if (createDeviceInterface(service, &device)) {
             UInt16 v = 0, p = 0;
-            if (device->GetDeviceVendor(device, &v) == kIOReturnSuccess &&
-                device->GetDeviceProduct(device, &p) == kIOReturnSuccess)
+            if ((*device)->GetDeviceVendor(device, &v) == kIOReturnSuccess &&
+                (*device)->GetDeviceProduct(device, &p) == kIOReturnSuccess)
                 match = v == kGoogleVendor && (p == kAccessoryPid || p == kAccessoryAdbPid);
-            device->Release(device);
+            (*device)->Release(device);
         }
         io_object_t next = IOIteratorNext(iterator);
         if (match) {
@@ -197,13 +196,13 @@ void requestAccessoryMode() {
         IOUSBDeviceInterface182** device = nullptr;
         if (createDeviceInterface(service, &device)) {
             UInt16 v = 0, p = 0;
-            if (device->GetDeviceVendor(device, &v) == kIOReturnSuccess &&
-                device->GetDeviceProduct(device, &p) == kIOReturnSuccess &&
+            if ((*device)->GetDeviceVendor(device, &v) == kIOReturnSuccess &&
+                (*device)->GetDeviceProduct(device, &p) == kIOReturnSuccess &&
                 v != kGoogleVendor && startAccessoryMode(device)) {
                 os_log(gLog, "Android accepted Open Accessory request");
-                device->Release(device); IOObjectRelease(service); break;
+                (*device)->Release(device); IOObjectRelease(service); break;
             }
-            device->Release(device);
+            (*device)->Release(device);
         }
         IOObjectRelease(service); service = IOIteratorNext(iterator);
     }
@@ -236,7 +235,7 @@ extern "C" bool SecondScreenUsbAccessorySend(const std::uint8_t* data, std::size
     if (!gRunning.load()) return false;
     std::lock_guard<std::mutex> lock(g.mutex);
     if (!g.ready || !g.iface || !data || size == 0 || size > UINT32_MAX) return false;
-    const IOReturn result = g.iface->WritePipeTO(g.iface, g.outPipe,
+    const IOReturn result = (*g.iface)->WritePipeTO(g.iface, g.outPipe,
         const_cast<std::uint8_t*>(data), static_cast<UInt32>(size), 100, 1000);
     if (result != kIOReturnSuccess) {
         releaseAccessoryLocked(); return false;
