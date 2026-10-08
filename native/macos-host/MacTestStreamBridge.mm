@@ -276,8 +276,9 @@ bool startEncoder() {
 
 void startCapture() {
     const CGDirectDisplayID display = CGMainDisplayID();
+    const double minimumFrameTime = 1.0 / kFps;
     CFNumberRef frameTime = CFNumberCreate(kCFAllocatorDefault, kCFNumberDoubleType,
-                                           &(double){1.0 / kFps});
+                                           &minimumFrameTime);
     const void* keys[] = {kCGDisplayStreamMinimumFrameTime};
     const void* values[] = {frameTime};
     CFDictionaryRef properties = CFDictionaryCreate(
