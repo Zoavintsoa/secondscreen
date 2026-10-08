@@ -33,6 +33,15 @@ bool DriverFramePublisher::initialize(ID3D11Device* device, uint32_t width, uint
     device_->GetImmediateContext(&context_);
     width_ = width;
     height_ = height;
+    QueryPerformanceFrequency(&qpcFrequency_);
+
+    Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
+    Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
+    if (SUCCEEDED(device_.As(&dxgiDevice)) &&
+        SUCCEEDED(dxgiDevice->GetAdapter(&adapter))) {
+        DXGI_ADAPTER_DESC desc{};
+        if (SUCCEEDED(adapter->GetDesc(&desc))) adapterLuid_ = desc.AdapterLuid;
+    }
 
     if (!createSharedObjects() || !createSlots()) {
         shutdown();
@@ -126,15 +135,7 @@ bool DriverFramePublisher::publish(ID3D11Texture2D* source, uint64_t timestampUs
         state->width = width_;
         state->height = height_;
         state->timestampUs = timestampUs;
-        LUID luid{};
-        Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
-        Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
-        if (SUCCEEDED(device_.As(&dxgiDevice)) &&
-            SUCCEEDED(dxgiDevice->GetAdapter(&adapter))) {
-            DXGI_ADAPTER_DESC desc{};
-            if (SUCCEEDED(adapter->GetDesc(&desc))) luid = desc.AdapterLuid;
-        }
-        state->adapterLuid = luid;
+        state->adapterLuid = adapterLuid_;
 
         state->slot = static_cast<LONG>(index);
         InterlockedExchange64(&state->sequence, ++sequence_);
@@ -178,6 +179,8 @@ void DriverFramePublisher::shutdown() {
     context_.Reset();
     device_.Reset();
     width_ = height_ = 0;
+    adapterLuid_ = {};
+    qpcFrequency_ = {};
     sequence_ = 0;
     nextSlot_ = 0;
 }
