@@ -31,6 +31,7 @@ class SecondScreenClient(
     private var streamConfig = StreamConfig()
     private val reassembler = VideoFragmentReassembler()
     private var awaitingKeyframe = true
+    private val usbAccessoryClient = UsbAccessoryClient(context)
 
     private val preferences =
         context.getSharedPreferences("secondscreen", Context.MODE_PRIVATE)
@@ -99,10 +100,18 @@ class SecondScreenClient(
             try {
                 reconnectRequested.set(false)
 
-                if (_connectionMode == ConnectionMode.USB) {
-                    onStatus("SecondScreen — USB sélectionné : transport USB natif en préparation")
-                    Thread.sleep(1500)
-                    continue
+                if (_connectionMode == ConnectionMode.USB || _connectionMode == ConnectionMode.AUTO) {
+                    val usbConnected = runCatching { consumeUsbIfAvailable() }.getOrElse { error ->
+                        if (_connectionMode == ConnectionMode.USB) {
+                            onStatus("SecondScreen — USB : " + (error.message ?: "connexion indisponible"))
+                        }
+                        false
+                    }
+                    if (usbConnected) continue
+                    if (_connectionMode == ConnectionMode.USB) {
+                        Thread.sleep(500)
+                        continue
+                    }
                 }
 
                 onStatus("SecondScreen — recherche d’un hôte…")
@@ -236,6 +245,24 @@ class SecondScreenClient(
             frame.timestampUs,
             keyFrame
         )
+    }
+
+    private fun consumeUsbIfAvailable(): Boolean {
+        val accessory = usbAccessoryClient.findSecondScreenAccessory() ?: return false
+        if (!usbAccessoryClient.hasPermission(accessory)) {
+            onStatus("SecondScreen — USB : autorisation système requise")
+            return false
+        }
+        awaitingKeyframe = true
+        reassembler.reset()
+        onStatus("SecondScreen — USB connecté, vidéo directe…")
+        usbAccessoryClient.consume(accessory) { codec, flags, timestampUs, payload ->
+            val keyFrame = (flags and 1) != 0
+            if (awaitingKeyframe && !keyFrame) return@consume
+            if (keyFrame) awaitingKeyframe = false
+            decode(codec, streamConfig.width, streamConfig.height, payload, timestampUs, keyFrame)
+        }
+        return true
     }
 
     private fun discoverHost(): HostAdvertisement? {
