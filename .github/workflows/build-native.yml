@@ -21,7 +21,10 @@ jobs:
       - name: Build Windows host
         shell: pwsh
         run: |
-          msbuild native/windows-host/SecondScreenHost/SecondScreenHost.vcxproj /p:Configuration=Release /p:Platform=x64
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild not found" }
+          & $msbuild native/windows-host/SecondScreenHost/SecondScreenHost.vcxproj /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot="$env:VCPKG_ROOT"
 
   android-client:
     runs-on: ubuntu-latest
@@ -55,7 +58,7 @@ jobs:
           xcrun --sdk iphoneos --show-sdk-path
       - name: Build macOS host
         run: |
-          xcodebuild             -project native/macos-host/SecondScreenMacHost.xcodeproj             -target SecondScreenMacHost             -configuration Release             -sdk macosx             CODE_SIGNING_ALLOWED=NO             build
+          xcodebuild -project native/macos-host/SecondScreenMacHost.xcodeproj -target SecondScreenMacHost -configuration Release -sdk macosx CODE_SIGNING_ALLOWED=NO build
       - name: Build iPadOS client
         run: |
-          xcodebuild             -project clients/ipados/SecondScreenIPad.xcodeproj             -target SecondScreenIPad             -configuration Release             -sdk iphoneos             -destination 'generic/platform=iOS'             CODE_SIGNING_ALLOWED=NO             build
+          xcodebuild -project clients/ipados/SecondScreenIPad.xcodeproj -target SecondScreenIPad -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' CODE_SIGNING_ALLOWED=NO build
