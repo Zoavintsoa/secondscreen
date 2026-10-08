@@ -220,12 +220,8 @@ void discoveryLoop() {
                 continue;
             }
 
-            if (bind(fd, entry->ifa_addr, sizeof(sockaddr_in)) < 0) {
-                os_log_error(gLog, "Discovery bind failed on %{public}s: %{public}d",
-                             entry->ifa_name, errno);
-                close(fd);
-                continue;
-            }
+            // REMOVED: bind(fd, entry->ifa_addr, sizeof(sockaddr_in))
+            // Reason: Binding to a specific host address on macOS often blocks UDP broadcast emission.
 
             sockaddr_in destination = *broadcast;
             destination.sin_family = AF_INET;
@@ -440,7 +436,6 @@ extern "C" void SecondScreenStartTestStream(void) {
         os_log_error(gLog, "Test stream aborted: display capture could not be created");
         g.running = false;
         if (g.discoveryThread.joinable()) g.discoveryThread.join();
-        if (g.serverThread.joinable()) g.serverThread.join();
         if (g.encoder) {
             VTCompressionSessionInvalidate(g.encoder);
             CFRelease(g.encoder);
@@ -460,7 +455,6 @@ extern "C" void SecondScreenStopTestStream(void) {
         g.stream = nullptr;
     }
     if (g.encoder) {
-        VTCompressionSessionCompleteFrames(g.encoder, kCMTimeInvalid);
         VTCompressionSessionInvalidate(g.encoder);
         CFRelease(g.encoder);
         g.encoder = nullptr;
