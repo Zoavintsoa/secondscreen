@@ -1,12 +1,11 @@
 import AppKit
+import Dispatch
 
 @NSApplicationMain
 final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        SecondScreenStartTestStream()
-
         let content = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 280))
         let title = NSTextField(labelWithString: "SecondScreen — Zoavintsoa")
         title.font = NSFont.systemFont(ofSize: 24, weight: .semibold)
@@ -45,6 +44,12 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         window.makeKeyAndOrderFront(nil)
         self.window = window
         NSApp.activate(ignoringOtherApps: true)
+
+        // Screen-capture permission can block while macOS displays its consent UI.
+        // Never block applicationDidFinishLaunching, otherwise the host window stays invisible.
+        DispatchQueue.global(qos: .userInitiated).async {
+            SecondScreenStartTestStream()
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
