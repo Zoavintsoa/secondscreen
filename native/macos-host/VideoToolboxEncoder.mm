@@ -19,7 +19,7 @@ EncoderCapabilities VideoToolboxEncoder::probe() {
 #if __MAC_OS_X_VERSION_MAX_ALLOWED >= 101300
     CFDictionaryRef properties = nullptr;
     if (VTCopySupportedPropertyDictionaryForEncoder(
-            1920, 1080, kCMVideoCodecType_HEVC, nullptr, &properties) == noErr) {
+            1920, 1080, kCMVideoCodecType_HEVC, nullptr, nullptr, &properties) == noErr) {
         caps.hevc = properties != nullptr;
         if (properties) CFRelease(properties);
     }
