@@ -51,7 +51,7 @@ void releaseAccessoryLocked() {
     g.ready = false;
 }
 
-bool deviceRequest(IOUSBDeviceInterface** device, UInt8 type, UInt8 request,
+bool deviceRequest(IOUSBDeviceInterface182** device, UInt8 type, UInt8 request,
                    UInt16 value, UInt16 index, void* data, UInt16 length) {
     IOUSBDevRequest req{};
     req.bmRequestType = type;
@@ -66,14 +66,14 @@ bool deviceRequest(IOUSBDeviceInterface** device, UInt8 type, UInt8 request,
     return device->DeviceRequestTO(device, &req) == kIOReturnSuccess;
 }
 
-bool sendString(IOUSBDeviceInterface** device, UInt16 id, const char* value) {
+bool sendString(IOUSBDeviceInterface182** device, UInt16 id, const char* value) {
     std::vector<char> data(value, value + std::strlen(value) + 1);
     if (data.size() > 255) return false;
     return deviceRequest(device, kUsbDirOut | kUsbTypeVendor | kUsbRecipientDevice,
                          kAoASendString, 0, id, data.data(), static_cast<UInt16>(data.size()));
 }
 
-bool startAccessoryMode(IOUSBDeviceInterface** device) {
+bool startAccessoryMode(IOUSBDeviceInterface182** device) {
     UInt16 protocol = 0;
     if (!deviceRequest(device, kUsbDirIn | kUsbTypeVendor | kUsbRecipientDevice,
                        kAoAGetProtocol, 0, 0, &protocol, sizeof(protocol)) || protocol < 1)
@@ -107,7 +107,7 @@ bool createInterface(io_service_t service, IOUSBInterfaceInterface182*** out) {
     return result == S_OK && *out;
 }
 bool openAccessoryDevice(io_service_t service) {
-    IOUSBDeviceInterface** device = nullptr;
+    IOUSBDeviceInterface182** device = nullptr;
     if (!createDeviceInterface(service, &device)) return false;
     UInt16 vendor = 0, product = 0;
     if (device->GetDeviceVendor(device, &vendor) != kIOReturnSuccess ||
@@ -128,7 +128,7 @@ bool openAccessoryDevice(io_service_t service) {
     if (device->CreateInterfaceIterator(device, &interfaceRequest, &iterator) != kIOReturnSuccess) {
         device->USBDeviceClose(device); device->Release(device); return false;
     }
-    IOUSBInterfaceInterface** chosen = nullptr; UInt8 inPipe = 0, outPipe = 0;
+    IOUSBInterfaceInterface182** chosen = nullptr; UInt8 inPipe = 0, outPipe = 0;
     while (io_service_t intfService = IOIteratorNext(iterator)) {
         IOUSBInterfaceInterface182** candidate = nullptr;
         if (createInterface(intfService, &candidate)) {
@@ -194,7 +194,7 @@ void requestAccessoryMode() {
     if (IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iterator) != kIOReturnSuccess) return;
     io_service_t service = IOIteratorNext(iterator);
     while (service && gRunning.load()) {
-        IOUSBDeviceInterface** device = nullptr;
+        IOUSBDeviceInterface182** device = nullptr;
         if (createDeviceInterface(service, &device)) {
             UInt16 v = 0, p = 0;
             if (device->GetDeviceVendor(device, &v) == kIOReturnSuccess &&
