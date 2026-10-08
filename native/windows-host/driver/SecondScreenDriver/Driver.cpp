@@ -800,7 +800,7 @@ NTSTATUS SecondScreenMonitorQueryModes(IDDCX_MONITOR MonitorObject, const IDARG_
     // end-to-end timing and encoder pacing are validated on hardware.
     TargetModes.push_back(CreateIddCxTargetMode(2560, 1440, 60));
     TargetModes.push_back(CreateIddCxTargetMode(1920, 1080, 60));
-    TargetModes.push_back(CreateIddCxTargetMode(1280, 720, 30));
+    TargetModes.push_back(CreateIddCxTargetMode(1280, 720, 60));
 
     pOutArgs->TargetModeBufferOutputCount = (UINT) TargetModes.size();
 
