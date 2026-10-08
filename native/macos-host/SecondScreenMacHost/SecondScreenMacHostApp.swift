@@ -61,6 +61,14 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        // Re-check capture permission and restart the native stream after returning
+        // from System Settings or after the app was re-opened from Finder.
+        DispatchQueue.global(qos: .userInitiated).async {
+            SecondScreenStartTestStream()
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         SecondScreenStopTestStream()
     }
