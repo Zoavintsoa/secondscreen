@@ -34,10 +34,21 @@ object DeviceCapabilitiesProbe {
                 val codec=when(mime){"video/avc"->1;"video/hevc"->2;else->continue}
                 val caps=runCatching{info.getCapabilitiesForType(type)}.getOrNull() ?: continue
                 val vc=caps.videoCapabilities ?: continue
-                val width=vc.supportedWidths.upper
-                val height=vc.supportedHeights.upper
-                val fps=runCatching{vc.getSupportedFrameRatesFor(width,height).upper}.getOrDefault(60.0)
-                codecs += VideoCapability(codec,mime,width,height,fps)
+                val candidates = listOf(
+                    Triple(3840,2160,60.0),
+                    Triple(2560,1440,60.0),
+                    Triple(1920,1080,60.0),
+                    Triple(1280,720,30.0)
+                )
+                for ((width,height,requestedFps) in candidates) {
+                    if (!runCatching { vc.isSizeSupported(width,height) }.getOrDefault(false)) continue
+                    val fps = runCatching {
+                        vc.getSupportedFrameRatesFor(width,height).upper
+                    }.getOrDefault(0.0)
+                    if (fps + 0.001 >= requestedFps) {
+                        codecs += VideoCapability(codec,mime,width,height,fps)
+                    }
+                }
             }
         }
         return DeviceCapabilities(Build.VERSION.SDK_INT,Build.MODEL,Build.MANUFACTURER,
