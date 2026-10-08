@@ -25,6 +25,7 @@ class SecondScreenClient(
     private var discoveredHost:HostAdvertisement?=null
     private var streamConfig=StreamConfig()
     private val reassembler=VideoFragmentReassembler()
+    private var awaitingKeyframe=true
     private val preferences=context.getSharedPreferences("secondscreen",Context.MODE_PRIVATE)
     private val deviceId:String by lazy {
         preferences.getString("deviceId",null) ?: UUID.randomUUID().toString().also{
@@ -95,6 +96,8 @@ class SecondScreenClient(
                     authenticated=true
                 }
 
+                awaitingKeyframe=true
+                reassembler.reset()
                 onStatus("SecondScreen — sécurisé, connexion vidéo…")
                 val s=Socket().apply{
                     tcpNoDelay=true
@@ -117,11 +120,12 @@ class SecondScreenClient(
 
     fun acceptQuicDatagram(datagram:ByteArray){
         if(!running.get())return
-        val frame=reassembler.accept(datagram)
-        if(frame!=null){
-            streamConfig=streamConfig.copy(codec=frame.codec).normalized()
-            decode(frame.codec,streamConfig.width,streamConfig.height,frame.annexB,frame.timestampUs,(frame.flags and 1)!=0)
-        }
+        val frame=reassembler.accept(datagram) ?: return
+        val keyFrame=(frame.flags and 1)!=0
+        if(awaitingKeyframe && !keyFrame)return
+        if(keyFrame)awaitingKeyframe=false
+        streamConfig=streamConfig.copy(codec=frame.codec).normalized()
+        decode(frame.codec,streamConfig.width,streamConfig.height,frame.annexB,frame.timestampUs,keyFrame)
     }
 
     private fun discoverHost():HostAdvertisement?{
@@ -141,7 +145,10 @@ class SecondScreenClient(
                     val length=input.readInt()
                     require(length in 1..16_777_216)
                     val au=ByteArray(length);input.readFully(au)
-                    decode(codec,streamConfig.width,streamConfig.height,au,timestamp,(flags and 1)!=0)
+                    val keyFrame=(flags and 1)!=0
+                    if(awaitingKeyframe && !keyFrame) continue
+                    if(keyFrame) awaitingKeyframe=false
+                    decode(codec,streamConfig.width,streamConfig.height,au,timestamp,keyFrame)
                 }
                 "SSVG"->{
                     controlClient?.requestKeyframe()
@@ -157,6 +164,7 @@ class SecondScreenClient(
         runCatching{
             decoder?.decode(codec,width,height,au,timestampUs,keyFrame)
         }.onFailure{
+            awaitingKeyframe=true
             controlClient?.requestKeyframe()
         }
     }
