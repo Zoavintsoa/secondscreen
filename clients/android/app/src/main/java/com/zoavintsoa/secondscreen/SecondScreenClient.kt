@@ -11,142 +11,237 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 class SecondScreenClient(
-    private val context:Context,
-    private val surface:SurfaceHolder,
-    private val onStatus:(String)->Unit,
-    private val onPairingRequired:(String)->String?
-):SurfaceHolder.Callback {
-    private val executor=Executors.newSingleThreadExecutor()
-    private val running=AtomicBoolean(false)
-    private var socket:Socket?=null
-    private var controlSocket:Socket?=null
-    private var controlClient:ControlClient?=null
-    private var decoder:VideoStreamDecoder?=null
-    private var discoveredHost:HostAdvertisement?=null
-    private var streamConfig=StreamConfig()
-    private val reassembler=VideoFragmentReassembler()
-    private var awaitingKeyframe=true
-    private val preferences=context.getSharedPreferences("secondscreen",Context.MODE_PRIVATE)
-    private val deviceId:String by lazy {
-        preferences.getString("deviceId",null) ?: UUID.randomUUID().toString().also{
-            preferences.edit().putString("deviceId",it).apply()
+    private val context: Context,
+    private val surface: SurfaceHolder,
+    private val onStatus: (String) -> Unit,
+    private val onPairingRequired: (String) -> String?
+) : SurfaceHolder.Callback {
+
+    enum class ConnectionMode { AUTO, WIFI, USB }
+
+    private val executor = Executors.newSingleThreadExecutor()
+    private val running = AtomicBoolean(false)
+    private val reconnectRequested = AtomicBoolean(false)
+
+    private var socket: Socket? = null
+    private var controlSocket: Socket? = null
+    private var controlClient: ControlClient? = null
+    private var decoder: VideoStreamDecoder? = null
+    private var discoveredHost: HostAdvertisement? = null
+    private var streamConfig = StreamConfig()
+    private val reassembler = VideoFragmentReassembler()
+    private var awaitingKeyframe = true
+
+    private val preferences =
+        context.getSharedPreferences("secondscreen", Context.MODE_PRIVATE)
+
+    private var _connectionMode: ConnectionMode =
+        runCatching {
+            ConnectionMode.valueOf(
+                preferences.getString("connectionMode", ConnectionMode.AUTO.name)
+                    ?: ConnectionMode.AUTO.name
+            )
+        }.getOrDefault(ConnectionMode.AUTO)
+
+    val connectionMode: ConnectionMode
+        get() = _connectionMode
+
+    private val deviceId: String by lazy {
+        preferences.getString("deviceId", null) ?: UUID.randomUUID().toString().also {
+            preferences.edit().putString("deviceId", it).apply()
         }
     }
 
-    override fun surfaceCreated(holder:SurfaceHolder){start()}
-    override fun surfaceChanged(holder:SurfaceHolder,format:Int,width:Int,height:Int)=Unit
-    override fun surfaceDestroyed(holder:SurfaceHolder){stop()}
+    override fun surfaceCreated(holder: SurfaceHolder) = start()
 
-    private fun start(){
-        if(!running.compareAndSet(false,true))return
-        executor.execute{connectLoop()}
+    override fun surfaceChanged(
+        holder: SurfaceHolder,
+        format: Int,
+        width: Int,
+        height: Int
+    ) = Unit
+
+    override fun surfaceDestroyed(holder: SurfaceHolder) = stop()
+
+    fun setConnectionMode(mode: ConnectionMode) {
+        if (_connectionMode == mode) return
+        _connectionMode = mode
+        preferences.edit().putString("connectionMode", mode.name).apply()
+        reconnectNow()
     }
 
-    private fun openControl(host:HostAdvertisement):ControlClient {
-        val cs=Socket().apply{
-            tcpNoDelay=true
-            connect(InetSocketAddress(host.address,host.controlPort),1500)
+    fun reconnectNow() {
+        if (!running.get()) return
+        reconnectRequested.set(true)
+        socket?.runCatching { close() }
+        controlSocket?.runCatching { close() }
+        onStatus("SecondScreen — nouvelle recherche…")
+    }
+
+    private fun start() {
+        if (!running.compareAndSet(false, true)) return
+        reconnectRequested.set(true)
+        executor.execute { connectLoop() }
+    }
+
+    private fun openControl(host: HostAdvertisement): ControlClient {
+        val cs = Socket().apply {
+            tcpNoDelay = true
+            keepAlive = true
+            connect(InetSocketAddress(host.address, host.controlPort), 1500)
         }
-        controlSocket=cs
-        return ControlClient(cs).also{controlClient=it}
+        controlSocket = cs
+        return ControlClient(cs).also { controlClient = it }
     }
 
-    private fun connectLoop(){
-        while(running.get()){
-            try{
+    private fun connectLoop() {
+        while (running.get()) {
+            try {
                 reconnectRequested.set(false)
+
                 if (_connectionMode == ConnectionMode.USB) {
-                    error("USB transport is not implemented yet")
+                    onStatus("SecondScreen — USB sélectionné : transport USB natif en préparation")
+                    Thread.sleep(1500)
+                    continue
                 }
+
                 onStatus("SecondScreen — recherche d’un hôte…")
-                val host=discoverHost() ?: error("No SecondScreen host found")
-                val capabilities=DeviceCapabilitiesProbe.probe(context)
+                val host = discoverHost() ?: error("Aucun hôte SecondScreen trouvé")
+
+                val capabilities = DeviceCapabilitiesProbe.probe(context)
                 if (capabilities.codecs.none { it.codec == 1 }) {
-                    error("No H.264 decoder available on this Android device")
+                    error("Aucun décodeur H.264 disponible sur cet Android")
                 }
 
                 val testMode = host.mode == "test"
-                if(testMode){
-                    streamConfig=streamConfig.copy(
-                        width=host.width,
-                        height=host.height,
-                        fps=host.fps,
-                        codec=1
+                if (testMode) {
+                    streamConfig = streamConfig.copy(
+                        width = host.width,
+                        height = host.height,
+                        fps = host.fps,
+                        codec = 1
                     ).normalized()
-                    onStatus("SecondScreen — test iMac détecté, connexion vidéo…")
+                    onStatus("SecondScreen — iMac détecté, connexion vidéo…")
                 } else {
-                    var cc=openControl(host)
-                    if(!cc.hello(deviceId,"Android SecondScreen",DeviceCapabilitiesProbe.helloJson(capabilities))){
-                        error("Control HELLO rejected")
+                    var cc = openControl(host)
+
+                    if (!cc.hello(
+                            deviceId,
+                            "Android SecondScreen",
+                            DeviceCapabilitiesProbe.helloJson(capabilities)
+                        )
+                    ) {
+                        error("HELLO de contrôle refusé")
                     }
 
-                    var authenticated=false
-                    val stored=preferences.getString("sessionToken",null)
-                    if(stored!=null){
-                        val result=runCatching{cc.authenticate(stored)}.getOrNull()
-                        if(result?.authenticated==true){
-                            authenticated=true
-                            result.streamConfig?.let{streamConfig=it.normalized()}
+                    var authenticated = false
+                    val stored = preferences.getString("sessionToken", null)
+
+                    if (!stored.isNullOrBlank()) {
+                        val result = runCatching { cc.authenticate(stored) }.getOrNull()
+                        if (result?.authenticated == true) {
+                            authenticated = true
+                            result.streamConfig?.let { streamConfig = it.normalized() }
                         } else {
-                            controlClient?.close()
-                            controlClient=null
-                            controlSocket=null
-                            cc=openControl(host)
-                            if(!cc.hello(deviceId,"Android SecondScreen",DeviceCapabilitiesProbe.helloJson(capabilities))){
-                                error("Control HELLO rejected after token reset")
+                            closeSocketsOnly()
+                            cc = openControl(host)
+                            if (!cc.hello(
+                                    deviceId,
+                                    "Android SecondScreen",
+                                    DeviceCapabilitiesProbe.helloJson(capabilities)
+                                )
+                            ) {
+                                error("HELLO de contrôle refusé après renouvellement")
                             }
                         }
                     }
 
-                    if(!authenticated){
+                    if (!authenticated) {
                         onStatus("SecondScreen — appairage requis")
-                        val code=onPairingRequired(host.name) ?: error("Pairing cancelled")
-                        val result=cc.pair(code.trim())
-                        if(!result.authenticated || result.sessionToken==null) error("Pairing rejected")
-                        preferences.edit().putString("sessionToken",result.sessionToken).apply()
-                        result.streamConfig?.let{streamConfig=it.normalized()}
+                        val code = onPairingRequired(host.name)
+                            ?: error("Appairage annulé")
+                        val result = cc.pair(code.trim())
+                        if (!result.authenticated || result.sessionToken.isNullOrBlank()) {
+                            error("Appairage refusé")
+                        }
+                        preferences.edit()
+                            .putString("sessionToken", result.sessionToken)
+                            .apply()
+                        result.streamConfig?.let { streamConfig = it.normalized() }
                     }
                 }
 
-                awaitingKeyframe=true
+                awaitingKeyframe = true
                 reassembler.reset()
-                onStatus(if(testMode) "SecondScreen — iMac connecté" else "SecondScreen — sécurisé, connexion vidéo…")
-                val s=Socket().apply{
-                    tcpNoDelay=true
-                    connect(InetSocketAddress(host.address,host.videoPort),1500)
+
+                val s = Socket().apply {
+                    tcpNoDelay = true
+                    keepAlive = true
+                    receiveBufferSize = 512 * 1024
+                    connect(InetSocketAddress(host.address, host.videoPort), 1500)
                 }
-                socket=s
+                socket = s
+
                 preferences.edit()
                     .putString("lastHostAddress", host.address)
                     .putString("lastHostName", host.name)
                     .apply()
+
+                onStatus(
+                    if (testMode) "SecondScreen — iMac connecté"
+                    else "SecondScreen — sécurisé, vidéo en cours…"
+                )
+
                 consumeVideo(DataInputStream(BufferedInputStream(s.getInputStream())))
-            }catch(t:Throwable){
-                onStatus("SecondScreen — reconnexion…")
-                if(running.get())Thread.sleep(1000)
-            }finally{
-                socket?.runCatching{close()};socket=null
-                controlClient?.runCatching{close()};controlClient=null
-                controlSocket?.runCatching{close()};controlSocket=null
-                decoder?.release();decoder=null
+            } catch (t: Throwable) {
+                if (!running.get()) break
+                if (t !is InterruptedException) {
+                    onStatus(
+                        if (_connectionMode == ConnectionMode.USB)
+                            "SecondScreen — USB indisponible"
+                        else
+                            "SecondScreen — reconnexion…"
+                    )
+                }
+                if (running.get()) {
+                    try {
+                        Thread.sleep(if (reconnectRequested.get()) 150L else 1000L)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        break
+                    }
+                }
+            } finally {
+                closeSocketsOnly()
+                decoder?.release()
+                decoder = null
                 reassembler.reset()
+                awaitingKeyframe = true
             }
         }
     }
 
-    fun acceptQuicDatagram(datagram:ByteArray){
-        if(!running.get())return
-        val frame=reassembler.accept(datagram) ?: return
-        val keyFrame=(frame.flags and 1)!=0
-        if(awaitingKeyframe && !keyFrame)return
-        if(keyFrame)awaitingKeyframe=false
-        streamConfig=streamConfig.copy(codec=frame.codec).normalized()
-        decode(frame.codec,streamConfig.width,streamConfig.height,frame.annexB,frame.timestampUs,keyFrame)
+    fun acceptQuicDatagram(datagram: ByteArray) {
+        if (!running.get() || _connectionMode == ConnectionMode.USB) return
+        val frame = reassembler.accept(datagram) ?: return
+        val keyFrame = (frame.flags and 1) != 0
+        if (awaitingKeyframe && !keyFrame) return
+        if (keyFrame) awaitingKeyframe = false
+        streamConfig = streamConfig.copy(codec = frame.codec).normalized()
+        decode(
+            frame.codec,
+            streamConfig.width,
+            streamConfig.height,
+            frame.annexB,
+            frame.timestampUs,
+            keyFrame
+        )
     }
 
-    private fun discoverHost():HostAdvertisement? {
+    private fun discoverHost(): HostAdvertisement? {
         val cachedAddress = preferences.getString("lastHostAddress", null)
-        val cachedName = preferences.getString("lastHostName", "SecondScreen Host") ?: "SecondScreen Host"
+        val cachedName =
+            preferences.getString("lastHostName", "SecondScreen Host") ?: "SecondScreen Host"
 
         val fresh = DiscoveryClient().discover(5000)
         if (fresh != null) {
@@ -154,7 +249,7 @@ class SecondScreenClient(
             return fresh
         }
 
-        if (_connectionMode == ConnectionMode.AUTO && cachedAddress != null) {
+        if (_connectionMode == ConnectionMode.AUTO && !cachedAddress.isNullOrBlank()) {
             val cached = HostAdvertisement(
                 address = cachedAddress,
                 name = cachedName,
@@ -162,63 +257,101 @@ class SecondScreenClient(
                 videoPort = 49153,
                 mode = "test"
             )
-            if (probeVideo(cached)) return cached
+            if (probeVideo(cached)) {
+                discoveredHost = cached
+                return cached
+            }
         }
         return null
     }
 
-    private fun probeVideo(host: HostAdvertisement): Boolean {
-        return runCatching {
+    private fun probeVideo(host: HostAdvertisement): Boolean =
+        runCatching {
             Socket().use {
                 it.tcpNoDelay = true
                 it.connect(InetSocketAddress(host.address, host.videoPort), 500)
             }
             true
         }.getOrDefault(false)
-    }
 
-    private fun consumeVideo(input:DataInputStream){
-        while(running.get()){
-            val magic=ByteArray(4);input.readFully(magic)
-            when(String(magic,Charsets.US_ASCII)){
-                "SSVF"->{
-                    val codec=input.readUnsignedByte()
-                    val flags=input.readUnsignedByte()
+    private fun consumeVideo(input: DataInputStream) {
+        while (running.get() && !reconnectRequested.get()) {
+            val magic = ByteArray(4)
+            input.readFully(magic)
+
+            when (String(magic, Charsets.US_ASCII)) {
+                "SSVF" -> {
+                    val codec = input.readUnsignedByte()
+                    val flags = input.readUnsignedByte()
                     input.readUnsignedShort()
-                    val timestamp=input.readLong()
-                    val length=input.readInt()
+                    val timestamp = input.readLong()
+                    val length = input.readInt()
                     require(length in 1..16_777_216)
-                    val au=ByteArray(length);input.readFully(au)
-                    val keyFrame=(flags and 1)!=0
-                    if(awaitingKeyframe && !keyFrame) continue
-                    if(keyFrame) awaitingKeyframe=false
-                    decode(codec,streamConfig.width,streamConfig.height,au,timestamp,keyFrame)
+
+                    val au = ByteArray(length)
+                    input.readFully(au)
+
+                    val keyFrame = (flags and 1) != 0
+                    if (awaitingKeyframe && !keyFrame) continue
+                    if (keyFrame) awaitingKeyframe = false
+
+                    decode(
+                        codec,
+                        streamConfig.width,
+                        streamConfig.height,
+                        au,
+                        timestamp,
+                        keyFrame
+                    )
                 }
-                "SSVG"->{
+
+                "SSVG" -> {
                     controlClient?.requestKeyframe()
-                    error("SSVG requires QUIC datagrams")
+                    error("SSVG nécessite le transport datagramme QUIC")
                 }
-                else->error("Unknown video frame magic")
+
+                else -> error("Trame vidéo inconnue")
             }
         }
     }
 
-    private fun decode(codec:Int,width:Int,height:Int,au:ByteArray,timestampUs:Long,keyFrame:Boolean){
-        if(decoder==null)decoder=VideoStreamDecoder(surface)
-        runCatching{
-            decoder?.decode(codec,width,height,au,timestampUs,keyFrame)
-        }.onFailure{
-            awaitingKeyframe=true
+    private fun decode(
+        codec: Int,
+        width: Int,
+        height: Int,
+        au: ByteArray,
+        timestampUs: Long,
+        keyFrame: Boolean
+    ) {
+        if (decoder == null) decoder = VideoStreamDecoder(surface)
+
+        runCatching {
+            decoder?.decode(codec, width, height, au, timestampUs, keyFrame)
+        }.onFailure {
+            awaitingKeyframe = true
             controlClient?.requestKeyframe()
         }
     }
 
-    fun close(){stop();executor.shutdownNow()}
+    fun close() {
+        stop()
+        executor.shutdownNow()
+    }
 
-    private fun stop(){
+    private fun stop() {
         running.set(false)
-        socket?.runCatching{close()}
-        controlSocket?.runCatching{close()}
-        decoder?.release();decoder=null
+        reconnectRequested.set(true)
+        closeSocketsOnly()
+        decoder?.release()
+        decoder = null
+    }
+
+    private fun closeSocketsOnly() {
+        socket?.runCatching { close() }
+        socket = null
+        controlClient?.runCatching { close() }
+        controlClient = null
+        controlSocket?.runCatching { close() }
+        controlSocket = null
     }
 }
