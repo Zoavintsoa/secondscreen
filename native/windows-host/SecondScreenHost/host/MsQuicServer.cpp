@@ -28,8 +28,8 @@ struct MsQuicServer::Impl {
     Config config;
     quic::TransportCallbacks callbacks;
     bool running{false};
-    bool connected{false};
-    uint16_t maxSendLength{1200};
+    std::atomic_bool connected{false};
+    std::atomic_uint16_t maxSendLength{1200};
 
 #if SECOND_SCREEN_HAS_MSQUIC
     const QUIC_API_TABLE* api{nullptr};
@@ -333,8 +333,8 @@ QUIC_STATUS QUIC_API connectionCallback(
         break;
 
     case QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED:
-        if (event->DATAGRAM_SEND_STATE_CHANGED.State !=
-            QUIC_DATAGRAM_SEND_LOST_SUSPECT) {
+        const auto state = event->DATAGRAM_SEND_STATE_CHANGED.State;
+        if (QUIC_DATAGRAM_SEND_STATE_IS_FINAL(state)) {
             delete static_cast<OwnedSendBuffer*>(
                 event->DATAGRAM_SEND_STATE_CHANGED.ClientContext);
         }
@@ -635,10 +635,13 @@ bool MsQuicServer::sendControl(
     (void)size;
     return false;
 #else
-    if (!impl_->api || !impl_->connectionContext) return false;
+    if (!impl_->api || !data || size == 0) return false;
 
+    std::lock_guard stateLock(impl_->stateMutex);
     auto* ctx = impl_->connectionContext;
-    std::lock_guard lock(ctx->sendMutex);
+    if (!ctx || !ctx->controlStream) return false;
+
+    std::lock_guard sendLock(ctx->sendMutex);
     return sendStream(*impl_, *ctx, data, size);
 #endif
 }
@@ -650,13 +653,15 @@ bool MsQuicServer::sendVideoDatagram(
     (void)size;
     return false;
 #else
-    if (!impl_->api ||
-        !impl_->connectionContext ||
-        !data ||
+    if (!impl_->api || !data ||
         size == 0 ||
-        size > impl_->maxSendLength) {
+        size > impl_->maxSendLength.load()) {
         return false;
     }
+
+    std::lock_guard stateLock(impl_->stateMutex);
+    auto* connectionContext = impl_->connectionContext;
+    if (!connectionContext) return false;
 
     auto* owned =
         new (std::nothrow) OwnedSendBuffer(data, size);
@@ -664,7 +669,7 @@ bool MsQuicServer::sendVideoDatagram(
 
     const QUIC_STATUS status =
         impl_->api->DatagramSend(
-            impl_->connectionContext->connection,
+            connectionContext->connection,
             &owned->buffer,
             1,
             QUIC_SEND_FLAG_NONE,
@@ -680,11 +685,11 @@ bool MsQuicServer::sendVideoDatagram(
 }
 
 bool MsQuicServer::connected() const {
-    return impl_->connected;
+    return impl_->connected.load();
 }
 
 quic::DatagramLimits MsQuicServer::datagramLimits() const {
-    return {impl_->maxSendLength};
+    return {impl_->maxSendLength.load()};
 }
 
 }
