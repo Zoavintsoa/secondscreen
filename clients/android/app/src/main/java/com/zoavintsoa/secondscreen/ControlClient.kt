@@ -13,34 +13,38 @@ class ControlClient(private val socket:Socket) {
     private val output=DataOutputStream(socket.getOutputStream())
 
     fun hello(deviceId:String,deviceName:String,capabilitiesJson:String="{}"):Boolean {
-        val json="{\"deviceId\":\"" + escape(deviceId) + "\",\"deviceName\":\"" + escape(deviceName) + "\",\"capabilities\":" + capabilitiesJson + "}"
+        val json="{"deviceId":"" + escape(deviceId) + "","deviceName":"" + escape(deviceName) + "","capabilities":" + capabilitiesJson + "}"
         send(0x01,json)
         return receive()?.type==0x04
     }
 
     fun authenticate(token:String):ControlResult {
-        send(0x0A,"{\"sessionToken\":\"" + escape(token) + "\"}")
+        send(0x0A,"{"sessionToken":"" + escape(token) + ""}")
         val auth=receive() ?: return ControlResult(false)
         if(auth.type!=0x05 && auth.type!=0x06) return ControlResult(false)
         if(auth.type==0x06) return ControlResult(true,token,StreamConfig.parse(auth.json))
         val config=runCatching {
             val old=socket.soTimeout
             socket.soTimeout=500
-            try { receive()?.takeIf{it.type==0x06}?.let{StreamConfig.parse(it.json)} } finally { socket.soTimeout=old }
+            try { receive()?.takeIf{it.type==0x05}?.let{StreamConfig.parse(it.json)} } finally { socket.soTimeout=old }
         }.getOrNull()
         return ControlResult(true,token,config)
     }
 
     fun pair(code:String):ControlResult {
-        send(0x02,"{\"code\":\"" + escape(code) + "\"}")
+        send(0x02,"{"code":"" + escape(code) + ""}")
         val response=receive() ?: return ControlResult(false)
-        if(response.type!=0x03 || !response.json.contains("\"status\":\"paired\"")) return ControlResult(false)
-        val token=Regex("\"sessionToken\"\\s*:\\s*\"([^\"]{64})\"").find(response.json)?.groupValues?.get(1)
+        if(response.type!=0x03 || !response.json.contains(""status":"paired"")) return ControlResult(false)
+        val token=Regex(""sessionToken"\s*:\s*"([^"]{64})"").find(response.json)?.groupValues?.get(1)
         val config=StreamConfig.parse(response.json)
         return ControlResult(token!=null,token,config)
     }
 
-    fun requestKeyframe(){send(0x0C,"{}")}
+    fun requestKeyframe() {
+        // Protocol v1: KEYFRAME_REQUEST = 0x0B.
+        send(0x0B,"{}")
+    }
+
     fun close(){runCatching{send(0x08,"{}")};runCatching{socket.close()}}
 
     private fun send(type:Int,json:String) {
@@ -62,6 +66,6 @@ class ControlClient(private val socket:Socket) {
         return ControlResponse(type,payload.toString(Charsets.UTF_8))
     }
 
-    private fun escape(v:String)=v.replace("\\","\\\\").replace("\"","\\\"")
+    private fun escape(v:String)=v.replace("\\","\\\\").replace(""","\\"")
     private data class ControlResponse(val type:Int,val json:String)
 }
