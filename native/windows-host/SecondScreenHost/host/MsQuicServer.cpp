@@ -22,8 +22,6 @@
 
 namespace second_screen {
 
-struct ConnectionContext;
-
 struct MsQuicServer::Impl {
     Config config;
     quic::TransportCallbacks callbacks;
@@ -43,6 +41,17 @@ struct MsQuicServer::Impl {
 };
 
 #if SECOND_SCREEN_HAS_MSQUIC
+
+struct ConnectionContext {
+    MsQuicServer::Impl* owner{};
+    HQUIC connection{};
+    HQUIC controlStream{};
+    control::ControlFrameParser parser{64 * 1024};
+    std::unique_ptr<control::ControlSession> session;
+    std::mutex sendMutex;
+    bool authenticated{false};
+};
+
 namespace {
 
 using second_screen::control::ControlFrameParser;
@@ -63,16 +72,6 @@ struct OwnedSendBuffer {
         buffer.Buffer = bytes.data();
         buffer.Length = static_cast<uint32_t>(bytes.size());
     }
-};
-
-struct ConnectionContext {
-    MsQuicServer::Impl* owner{};
-    HQUIC connection{};
-    HQUIC controlStream{};
-    ControlFrameParser parser{kMaxControlPayload};
-    std::unique_ptr<ControlSession> session;
-    std::mutex sendMutex;
-    bool authenticated{false};
 };
 
 bool parseThumbprint(const std::string& text, std::array<uint8_t, 20>& out) {
