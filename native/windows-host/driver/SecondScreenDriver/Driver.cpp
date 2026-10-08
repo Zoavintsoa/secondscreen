@@ -440,12 +440,15 @@ void SwapChainProcessor::RunCore()
                     }
                 }
                 if (m_FramePublisherInitialized) {
-                    LARGE_INTEGER frequency{};
+                    static const LONGLONG qpcFrequency = [] {
+                        LARGE_INTEGER value{};
+                        QueryPerformanceFrequency(&value);
+                        return value.QuadPart;
+                    }();
                     LARGE_INTEGER counter{};
-                    QueryPerformanceFrequency(&frequency);
                     QueryPerformanceCounter(&counter);
-                    const uint64_t timestampUs = frequency.QuadPart > 0
-                        ? static_cast<uint64_t>((counter.QuadPart * 1000000LL) / frequency.QuadPart)
+                    const uint64_t timestampUs = qpcFrequency > 0
+                        ? static_cast<uint64_t>((counter.QuadPart * 1000000LL) / qpcFrequency)
                         : 0;
                     m_FramePublisher.publish(sourceTexture.Get(), timestampUs);
                 }
