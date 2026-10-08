@@ -111,7 +111,7 @@ std::vector<uint8_t> makeControlFrame(
     uint8_t major) {
     if (major != kProtocolMajor ||
         !isKnownMessageType(static_cast<uint8_t>(type)) ||
-        json.size() > std::numeric_limits<uint32_t>::max()) {
+        json.size() > kDefaultMaxPayloadBytes) {
         return {};
     }
 
