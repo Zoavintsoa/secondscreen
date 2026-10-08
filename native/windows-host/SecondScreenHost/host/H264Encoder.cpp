@@ -39,13 +39,13 @@ bool H264Encoder::initialize(uint32_t width, uint32_t height, uint32_t fps, uint
     height_ = height;
     fps_ = fps;
     bitrateKbps_ = bitrateKbps;
+    started_ = true; // Ensure failure paths call MFShutdown().
 
     if (!configureD3DManager() || !createEncoder() || !configureEncoder()) {
         shutdown();
         return false;
     }
 
-    started_ = true;
     return true;
 }
 
