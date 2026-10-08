@@ -67,8 +67,8 @@ bool DriverFrameReceiver::openDevice() {
 
     adapterLuid_ = state->adapterLuid;
 
-    Microsoft::WRL::ComPtr<IDXGIFactory1> factory;
-    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory)))) return false;
+    Microsoft::WRL::ComPtr<IDXGIFactory4> factory;
+    if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory)))) return false;
 
     Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
     if (FAILED(factory->EnumAdapterByLuid(adapterLuid_, IID_PPV_ARGS(&adapter)))) return false;
