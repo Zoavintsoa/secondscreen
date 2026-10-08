@@ -24,8 +24,8 @@ constexpr UInt8 kUsbTypeVendor = 0x40;
 constexpr UInt8 kUsbRecipientDevice = 0x00;
 
 struct AccessoryState {
-    IOUSBDeviceInterface** device = nullptr;
-    IOUSBInterfaceInterface** iface = nullptr;
+    IOUSBDeviceInterface182** device = nullptr;
+    IOUSBInterfaceInterface182** iface = nullptr;
     UInt8 inPipe = 0;
     UInt8 outPipe = 0;
     std::mutex mutex;
@@ -61,6 +61,8 @@ bool deviceRequest(IOUSBDeviceInterface** device, UInt8 type, UInt8 request,
     req.wLength = length;
     req.pData = data;
     req.wLenDone = 0;
+    req.completionTimeout = 1000;
+    req.noDataTimeout = 1000;
     return device->DeviceRequestTO(device, &req) == kIOReturnSuccess;
 }
 
@@ -86,20 +88,20 @@ bool startAccessoryMode(IOUSBDeviceInterface** device) {
                          kAoAStart, 0, 0, nullptr, 0);
 }
 
-bool createDeviceInterface(io_service_t service, IOUSBDeviceInterface*** out) {
+bool createDeviceInterface(io_service_t service, IOUSBDeviceInterface182*** out) {
     IOCFPlugInInterface** plugin = nullptr; SInt32 score = 0;
     if (IOCreatePlugInInterfaceForService(service, kIOUSBDeviceUserClientTypeID,
         kIOCFPlugInInterfaceID, &plugin, &score) != kIOReturnSuccess || !plugin) return false;
-    HRESULT result = (*plugin)->QueryInterface(plugin, CFUUIDGetUUIDBytes(kIOUSBDeviceInterfaceID),
+    HRESULT result = (*plugin)->QueryInterface(plugin, CFUUIDGetUUIDBytes(kIOUSBDeviceInterfaceID182),
         reinterpret_cast<LPVOID*>(out));
     (*plugin)->Release(plugin);
     return result == S_OK && *out;
 }
-bool createInterface(io_service_t service, IOUSBInterfaceInterface*** out) {
+bool createInterface(io_service_t service, IOUSBInterfaceInterface182*** out) {
     IOCFPlugInInterface** plugin = nullptr; SInt32 score = 0;
     if (IOCreatePlugInInterfaceForService(service, kIOUSBInterfaceUserClientTypeID,
         kIOCFPlugInInterfaceID, &plugin, &score) != kIOReturnSuccess || !plugin) return false;
-    HRESULT result = (*plugin)->QueryInterface(plugin, CFUUIDGetUUIDBytes(kIOUSBInterfaceInterfaceID),
+    HRESULT result = (*plugin)->QueryInterface(plugin, CFUUIDGetUUIDBytes(kIOUSBInterfaceInterfaceID182),
         reinterpret_cast<LPVOID*>(out));
     (*plugin)->Release(plugin);
     return result == S_OK && *out;
@@ -118,12 +120,17 @@ bool openAccessoryDevice(io_service_t service) {
         device->USBDeviceClose(device); device->Release(device); return false;
     }
     io_iterator_t iterator = IO_OBJECT_NULL;
-    if (device->CreateInterfaceIterator(device, &iterator) != kIOReturnSuccess) {
+    IOUSBFindInterfaceRequest interfaceRequest{};
+    interfaceRequest.bInterfaceClass = kIOUSBFindInterfaceDontCare;
+    interfaceRequest.bInterfaceSubClass = kIOUSBFindInterfaceDontCare;
+    interfaceRequest.bInterfaceProtocol = kIOUSBFindInterfaceDontCare;
+    interfaceRequest.bAlternateSetting = kIOUSBFindInterfaceDontCare;
+    if (device->CreateInterfaceIterator(device, &interfaceRequest, &iterator) != kIOReturnSuccess) {
         device->USBDeviceClose(device); device->Release(device); return false;
     }
     IOUSBInterfaceInterface** chosen = nullptr; UInt8 inPipe = 0, outPipe = 0;
     while (io_service_t intfService = IOIteratorNext(iterator)) {
-        IOUSBInterfaceInterface** candidate = nullptr;
+        IOUSBInterfaceInterface182** candidate = nullptr;
         if (createInterface(intfService, &candidate)) {
             UInt8 count = 0;
             if (candidate->GetNumEndpoints(candidate, &count) == kIOReturnSuccess) {
@@ -161,7 +168,7 @@ bool findAccessory(io_service_t* result) {
     if (IOServiceGetMatchingServices(kIOMasterPortDefault, matching, &iterator) != kIOReturnSuccess) return false;
     io_service_t service = IOIteratorNext(iterator);
     while (service) {
-        IOUSBDeviceInterface** device = nullptr; bool match = false;
+        IOUSBDeviceInterface182** device = nullptr; bool match = false;
         if (createDeviceInterface(service, &device)) {
             UInt16 v = 0, p = 0;
             if (device->GetDeviceVendor(device, &v) == kIOReturnSuccess &&
