@@ -35,6 +35,8 @@ private:
     void* stateView_{nullptr};
     uint32_t width_{};
     uint32_t height_{};
+    LUID adapterLuid_{};
+    LARGE_INTEGER qpcFrequency_{};
     LONG64 sequence_{};
     uint32_t nextSlot_{};
 };
