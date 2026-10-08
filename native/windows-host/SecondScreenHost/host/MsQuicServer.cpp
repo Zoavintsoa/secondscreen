@@ -332,13 +332,14 @@ QUIC_STATUS QUIC_API connectionCallback(
         }
         break;
 
-    case QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED:
+    case QUIC_CONNECTION_EVENT_DATAGRAM_SEND_STATE_CHANGED: {
         const auto state = event->DATAGRAM_SEND_STATE_CHANGED.State;
         if (QUIC_DATAGRAM_SEND_STATE_IS_FINAL(state)) {
             delete static_cast<OwnedSendBuffer*>(
                 event->DATAGRAM_SEND_STATE_CHANGED.ClientContext);
         }
         break;
+    }
 
     case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
         impl.api->ConnectionClose(connection);
