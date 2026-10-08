@@ -18,6 +18,10 @@
     <ConfigurationType>Application</ConfigurationType><UseDebugLibraries>false</UseDebugLibraries><PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)Microsoft.Cpp.props" />
+  <PropertyGroup Label="Vcpkg">
+    <VcpkgEnableManifest>true</VcpkgEnableManifest>
+    <VcpkgTriplet>x64-windows</VcpkgTriplet>
+  </PropertyGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="host\HostServer.cpp" />
@@ -60,12 +64,12 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <WarningLevel>Level4</WarningLevel>
       <PreprocessorDefinitions>WIN32_LEAN_AND_MEAN;NOMINMAX;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\shared-protocol;$(VCPKG_ROOT)\installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\shared-protocol;$(VcpkgInstalledDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <AdditionalDependencies>Ws2_32.lib;Mfplat.lib;Mf.lib;Mfuuid.lib;Shlwapi.lib;Bcrypt.lib;D3D11.lib;DXGI.lib;Ole32.lib;Advapi32.lib;msquic.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(VCPKG_ROOT)\installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(VcpkgInstalledDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)Microsoft.Cpp.targets" />
