@@ -56,6 +56,9 @@ class SecondScreenClient(
                 onStatus("SecondScreen — recherche d’un hôte…")
                 val host=discoverHost() ?: error("No SecondScreen host found")
                 val capabilities=DeviceCapabilitiesProbe.probe(context)
+                if (capabilities.codecs.none { it.codec == 1 }) {
+                    error("No H.264 decoder available on this Android device")
+                }
 
                 var cc=openControl(host)
                 if(!cc.hello(deviceId,"Android SecondScreen",DeviceCapabilitiesProbe.helloJson(capabilities))){
