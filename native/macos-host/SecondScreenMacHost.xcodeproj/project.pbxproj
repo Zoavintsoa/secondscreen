@@ -16,6 +16,8 @@
     B10000000000000000000007 = {isa = PBXBuildFile; fileRef = B10000000000000000000018; };
     B10000000000000000000008 = {isa = PBXBuildFile; fileRef = B10000000000000000000019; };
     B10000000000000000000009 = {isa = PBXBuildFile; fileRef = B1000000000000000000001A; };
+    B1000000000000000000000A = {isa = PBXBuildFile; fileRef = B1000000000000000000001D; };
+    B1000000000000000000000B = {isa = PBXBuildFile; fileRef = B1000000000000000000001E; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -37,7 +39,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-    B10000000000000000000020 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (B10000000000000000000006, B10000000000000000000007, B10000000000000000000008, B1000000000000000000001D, B1000000000000000000001E,); runOnlyForDeploymentPostprocessing = 0; };
+    B10000000000000000000020 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (B10000000000000000000006, B10000000000000000000007, B10000000000000000000008, B1000000000000000000000A, B1000000000000000000000B,); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -61,7 +63,7 @@
 
 /* Begin XCBuildConfiguration section */
     B10000000000000000000070 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; CODE_SIGNING_ALLOWED = NO; SWIFT_OBJC_BRIDGING_HEADER = "SecondScreenMacHost/SecondScreenMacHost-Bridging-Header.h"; INFOPLIST_FILE = SecondScreenMacHost/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.machost; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; MACOSX_DEPLOYMENT_TARGET = 10.15; }; name = Debug; };
-    B10000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenMacHost/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.machost; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; MACOSX_DEPLOYMENT_TARGET = 10.15; }; name = Release; };
+    B10000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CLANG_CXX_LANGUAGE_STANDARD = "gnu++20"; CODE_SIGNING_ALLOWED = NO; SWIFT_OBJC_BRIDGING_HEADER = "SecondScreenMacHost/SecondScreenMacHost-Bridging-Header.h"; INFOPLIST_FILE = SecondScreenMacHost/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.machost; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = macosx; SWIFT_VERSION = 5.0; MACOSX_DEPLOYMENT_TARGET = 10.15; }; name = Release; };
     B10000000000000000000072 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Debug; };
     B10000000000000000000073 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Release; };
 /* End XCBuildConfiguration section */
