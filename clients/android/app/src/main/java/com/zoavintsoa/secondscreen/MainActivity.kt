@@ -14,6 +14,7 @@ import java.util.concurrent.CountDownLatch
 
 class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
+    private lateinit var connectionModeButton: android.widget.Button
     private var client: SecondScreenClient? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -22,10 +23,21 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
         status = findViewById(R.id.status)
+        connectionModeButton = findViewById(R.id.connectionModeButton)
 
         findViewById<android.widget.Button>(R.id.aboutButton).setOnClickListener {
             showAbout()
         }
+
+        findViewById<android.widget.Button>(R.id.reconnectButton).setOnClickListener {
+            client?.reconnectNow()
+        }
+
+        connectionModeButton.setOnClickListener {
+            showConnectionMode()
+        }
+
+        updateConnectionModeButton()
 
         if (legalAccepted()) {
             initializeClient()
@@ -47,6 +59,43 @@ class MainActivity : ComponentActivity() {
             { hostName -> requestPairingCode(hostName) }
         )
         surface.holder.addCallback(client)
+    }
+
+    private fun showConnectionMode() {
+        val current = client?.connectionMode ?: SecondScreenClient.ConnectionMode.AUTO
+        val labels = arrayOf(
+            "Automatique — USB si disponible, sinon Wi-Fi",
+            "Wi-Fi / LAN",
+            "USB — liaison filaire"
+        )
+        val checked = when (current) {
+            SecondScreenClient.ConnectionMode.AUTO -> 0
+            SecondScreenClient.ConnectionMode.WIFI -> 1
+            SecondScreenClient.ConnectionMode.USB -> 2
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Mode de connexion")
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                val mode = when (which) {
+                    1 -> SecondScreenClient.ConnectionMode.WIFI
+                    2 -> SecondScreenClient.ConnectionMode.USB
+                    else -> SecondScreenClient.ConnectionMode.AUTO
+                }
+                client?.setConnectionMode(mode)
+                updateConnectionModeButton()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
+    }
+
+    private fun updateConnectionModeButton() {
+        val mode = client?.connectionMode ?: SecondScreenClient.ConnectionMode.AUTO
+        connectionModeButton.text = when (mode) {
+            SecondScreenClient.ConnectionMode.AUTO -> "Connexion : Auto"
+            SecondScreenClient.ConnectionMode.WIFI -> "Connexion : Wi-Fi"
+            SecondScreenClient.ConnectionMode.USB -> "Connexion : USB"
+        }
     }
 
     private fun showLegalNotice() {
