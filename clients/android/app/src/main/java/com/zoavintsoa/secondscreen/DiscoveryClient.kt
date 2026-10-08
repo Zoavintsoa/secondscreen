@@ -9,7 +9,11 @@ data class HostAdvertisement(
     val address: String,
     val name: String,
     val controlPort: Int,
-    val videoPort: Int
+    val videoPort: Int,
+    val mode: String = "production",
+    val width: Int = 1920,
+    val height: Int = 1080,
+    val fps: Int = 60
 )
 
 class DiscoveryClient {
@@ -30,7 +34,11 @@ class DiscoveryClient {
                     address = packet.address.hostAddress ?: return null,
                     name = json.optString("name", "SecondScreen Host"),
                     controlPort = json.optInt("controlPort", 49152),
-                    videoPort = json.optInt("videoPort", 49153)
+                    videoPort = json.optInt("videoPort", 49153),
+                    mode = json.optString("mode", "production"),
+                    width = json.optInt("width", 1920),
+                    height = json.optInt("height", 1080),
+                    fps = json.optInt("fps", 60)
                 )
             } catch (_: SocketTimeoutException) {
                 null
