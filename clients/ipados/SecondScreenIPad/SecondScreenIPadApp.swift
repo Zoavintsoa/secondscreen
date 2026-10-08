@@ -97,7 +97,7 @@ Your devices become your workspace.
 Créé et développé par Zoavintsoa.
 Native • Cross-platform • Local-first
 
-Cible iPadOS 13 et versions compatibles selon les capacités réelles de l’appareil.
+Cible iPadOS 14 et versions compatibles selon les capacités réelles de l’appareil.
 Version 0.1.0.
 """
 
