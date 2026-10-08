@@ -1,7 +1,12 @@
 package com.zoavintsoa.secondscreen
 
 import android.app.AlertDialog
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.text.InputType
 import android.view.WindowManager
@@ -17,11 +22,22 @@ class MainActivity : ComponentActivity() {
     private lateinit var connectionModeButton: android.widget.Button
     private var client: SecondScreenClient? = null
 
+    private val usbPermissionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action != ACTION_USB_PERMISSION) return
+            val granted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)
+            runOnUiThread { status.text = if (granted) "SecondScreen — USB autorisé, connexion…" else "SecondScreen — autorisation USB refusée" }
+            client?.reconnectNow()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
+        registerReceiver(usbPermissionReceiver, IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED)
+        requestUsbPermissionIfNeeded()
         status = findViewById(R.id.status)
         connectionModeButton = findViewById(R.id.connectionModeButton)
 
@@ -48,6 +64,23 @@ class MainActivity : ComponentActivity() {
 
     private fun legalAccepted(): Boolean =
         getPreferences(Context.MODE_PRIVATE).getBoolean("legal_accepted_v1", false)
+
+    private fun requestUsbPermissionIfNeeded() {
+        val manager = getSystemService(Context.USB_SERVICE) as UsbManager
+        val accessory = manager.accessoryList?.firstOrNull {
+            it.manufacturer == UsbAccessoryClient.MANUFACTURER && it.model == UsbAccessoryClient.MODEL
+        } ?: return
+        if (manager.hasPermission(accessory)) return
+        val intent = Intent(ACTION_USB_PERMISSION).setPackage(packageName)
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        manager.requestPermission(accessory, PendingIntent.getBroadcast(this, 1001, intent, flags))
+    }
+
+    override fun onResume() {
+        super.onResume()
+        requestUsbPermissionIfNeeded()
+        client?.reconnectNow()
+    }
 
     private fun initializeClient() {
         if (client != null) return
@@ -182,10 +215,12 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         client?.close()
         client = null
+        runCatching { unregisterReceiver(usbPermissionReceiver) }
         super.onDestroy()
     }
 
     private companion object {
+        const val ACTION_USB_PERMISSION = "com.zoavintsoa.secondscreen.USB_PERMISSION"
         const val TERMS = """
 SecondScreen — Conditions d’utilisation
 
