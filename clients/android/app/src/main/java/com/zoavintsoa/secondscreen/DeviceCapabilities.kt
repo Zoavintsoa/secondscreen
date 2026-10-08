@@ -40,7 +40,7 @@ object DeviceCapabilitiesProbe {
                 codecs += VideoCapability(codec,mime,width,height,fps)
             }
         }
-        return DeviceCapabilities(Build.VERSION.SDK_INT,Build.MODEL?:"Android",Build.MANUFACTURER?:"unknown",
+        return DeviceCapabilities(Build.VERSION.SDK_INT,Build.MODEL,Build.MANUFACTURER,
             touch,stylus,min(refresh,240f),hdr,codecs.distinctBy{Triple(it.codec,it.maxWidth,it.maxHeight)})
     }
 
