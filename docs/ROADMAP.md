@@ -101,6 +101,18 @@ A checkbox is not marked complete because code exists. It is complete only after
 - No device-specific manufacturer/model assumptions were introduced.
 
 
+### 2026-10-08 final code synchronization pass
+- [x] Fix zero-length control-parser pointer handling and align frame construction/parser payload limits.
+- [x] Validate SSVG codec values before fragmentation and validate fragment metadata consistently on Android.
+- [x] Fix VideoStreamServer shutdown lock/join deadlock.
+- [x] Fix DriverFrameReceiver null-host startup semantics.
+- [x] Fix H.264 Media Foundation startup cleanup so failed initialization cannot leak MF startup state.
+- [x] Align IddCx advertised refresh modes with the current 60 FPS capture/encode path.
+- [x] Remove the IddCx realtime-GPU call from the legacy-compatible driver path; that API requires newer Windows/IddCx versions and is not a dependency of the baseline pipeline.
+- [x] Repair the malformed iPad Xcode project object identifier.
+- [x] Fix MsQuic datagram send-buffer lifetime and C++ callback switch scoping.
+- [ ] Do not mark the end-to-end product validated until CI passes and physical Windows/Android hardware tests succeed.
+
 ### 2026-10-08 deep consistency and reliability pass
 - [x] Fix Android pairing so a newly paired client receives the same baseline stream configuration as the host.
 - [x] Reconnect with a fresh control socket after an expired/revoked session token; do not reuse a server-closed TCP session.
