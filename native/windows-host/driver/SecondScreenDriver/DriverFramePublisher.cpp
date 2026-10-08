@@ -33,7 +33,6 @@ bool DriverFramePublisher::initialize(ID3D11Device* device, uint32_t width, uint
     device_->GetImmediateContext(&context_);
     width_ = width;
     height_ = height;
-    QueryPerformanceFrequency(&qpcFrequency_);
 
     Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
     Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
@@ -180,7 +179,6 @@ void DriverFramePublisher::shutdown() {
     device_.Reset();
     width_ = height_ = 0;
     adapterLuid_ = {};
-    qpcFrequency_ = {};
     sequence_ = 0;
     nextSlot_ = 0;
 }
