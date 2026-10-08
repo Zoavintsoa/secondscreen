@@ -599,9 +599,17 @@ void MsQuicServer::stop() {
             0);
     }
 
-    if (impl_->connectionContext) {
+    HQUIC connectionToStop = nullptr;
+    {
+        std::lock_guard lock(impl_->stateMutex);
+        if (impl_->connectionContext) {
+            connectionToStop = impl_->connectionContext->connection;
+        }
+    }
+
+    if (connectionToStop) {
         impl_->api->ConnectionShutdown(
-            impl_->connectionContext->connection,
+            connectionToStop,
             QUIC_CONNECTION_SHUTDOWN_FLAG_SILENT,
             0);
         std::unique_lock lock(impl_->stateMutex);
