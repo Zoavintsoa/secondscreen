@@ -384,12 +384,6 @@ void SwapChainProcessor::RunCore()
         return;
     }
 
-    // On supported Windows 11 systems, request realtime GPU scheduling for
-    // this swap-chain. Older systems may return E_NOTIMPL; that is harmless.
-    IDARG_IN_SETREALTIMEGPUPRIORITY priorityArgs{};
-    priorityArgs.pDevice = DxgiDevice.Get();
-    IddCxSetRealtimeGPUPriority(m_hSwapChain, &priorityArgs);
-
     // Acquire and release buffers in a loop
     for (;;)
     {
@@ -801,16 +795,12 @@ NTSTATUS SecondScreenMonitorQueryModes(IDDCX_MONITOR MonitorObject, const IDARG_
     // monitor's descriptor and instead are based on the static processing capability of the device. The OS will
     // report the available set of modes for a given output as the intersection of monitor modes with target modes.
 
-    TargetModes.push_back(CreateIddCxTargetMode(3840, 2160, 60));
-    TargetModes.push_back(CreateIddCxTargetMode(2560, 1440, 144));
-    TargetModes.push_back(CreateIddCxTargetMode(2560, 1440, 90));
+    // Keep advertised modes synchronized with the validated baseline stream
+    // profiles. High-refresh modes are intentionally not advertised until
+    // end-to-end timing and encoder pacing are validated on hardware.
     TargetModes.push_back(CreateIddCxTargetMode(2560, 1440, 60));
-    TargetModes.push_back(CreateIddCxTargetMode(1920, 1080, 144));
-    TargetModes.push_back(CreateIddCxTargetMode(1920, 1080, 90));
     TargetModes.push_back(CreateIddCxTargetMode(1920, 1080, 60));
-    TargetModes.push_back(CreateIddCxTargetMode(1600,  900, 60));
-    TargetModes.push_back(CreateIddCxTargetMode(1024,  768, 75));
-    TargetModes.push_back(CreateIddCxTargetMode(1024,  768, 60));
+    TargetModes.push_back(CreateIddCxTargetMode(1280, 720, 30));
 
     pOutArgs->TargetModeBufferOutputCount = (UINT) TargetModes.size();
 
