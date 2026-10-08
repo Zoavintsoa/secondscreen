@@ -39,7 +39,7 @@ bool H264Encoder::initialize(uint32_t width, uint32_t height, uint32_t fps, uint
     height_ = height;
     fps_ = fps;
     bitrateKbps_ = bitrateKbps;
-    started_ = true; // Ensure failure paths call MFShutdown().
+    started_ = true;
 
     if (!configureD3DManager() || !createEncoder() || !configureEncoder()) {
         shutdown();
@@ -58,14 +58,22 @@ bool H264Encoder::createEncoder() {
     MFT_REGISTER_TYPE_INFO inputInfo{MFMediaType_Video, MFVideoFormat_NV12};
     MFT_REGISTER_TYPE_INFO outputInfo{MFMediaType_Video, MFVideoFormat_H264};
 
+    // MFTEnumEx takes input type first and output type second. Prefer a
+    // hardware encoder, then fall back to a software/local MFT without
+    // depending on a linker-visible CLSID for the inbox H.264 encoder.
+    const DWORD hardwareFlags =
+        MFT_ENUM_FLAG_HARDWARE | MFT_ENUM_FLAG_SORTANDFILTER;
+    const DWORD fallbackFlags =
+        MFT_ENUM_FLAG_SORTANDFILTER | MFT_ENUM_FLAG_SYNCMFT | MFT_ENUM_FLAG_LOCALMFT;
+
     IMFActivate** activates = nullptr;
     UINT32 count = 0;
 
     HRESULT hr = MFTEnumEx(
         MFT_CATEGORY_VIDEO_ENCODER,
-        MFT_ENUM_FLAG_HARDWARE | MFT_ENUM_FLAG_SORTANDFILTER,
-        &outputInfo,
+        hardwareFlags,
         &inputInfo,
+        &outputInfo,
         &activates,
         &count);
 
@@ -75,13 +83,26 @@ bool H264Encoder::createEncoder() {
 
     for (UINT32 i = 0; i < count; ++i) activates[i]->Release();
     CoTaskMemFree(activates);
+    activates = nullptr;
+    count = 0;
 
     if (FAILED(hr) || !transform_) {
-        // The inbox software encoder remains a valid fallback.
-        hr = CoCreateInstance(
-            CLSID_CMSH264EncoderMFT, nullptr, CLSCTX_INPROC_SERVER,
-            IID_PPV_ARGS(&transform_));
+        hr = MFTEnumEx(
+            MFT_CATEGORY_VIDEO_ENCODER,
+            fallbackFlags,
+            &inputInfo,
+            &outputInfo,
+            &activates,
+            &count);
+
+        if (SUCCEEDED(hr) && count) {
+            hr = activates[0]->ActivateObject(IID_PPV_ARGS(&transform_));
+        }
+
+        for (UINT32 i = 0; i < count; ++i) activates[i]->Release();
+        CoTaskMemFree(activates);
     }
+
     if (FAILED(hr) || !transform_) return false;
 
     transform_->QueryInterface(IID_PPV_ARGS(&codecApi_));
@@ -134,8 +155,6 @@ bool H264Encoder::configureEncoder() {
     hr = transform_->SetOutputType(0, outputType_.Get(), 0);
     if (FAILED(hr)) return false;
 
-    // Some MFTs expose SPS/PPS only after the output type is accepted.
-    // Query the current output type as a second chance before the first frame.
     Microsoft::WRL::ComPtr<IMFMediaType> currentOutputType;
     if (SUCCEEDED(transform_->GetOutputCurrentType(0, &currentOutputType))) {
         UINT32 sequenceSize = 0;
@@ -215,12 +234,7 @@ bool H264Encoder::encode(ID3D11Texture2D* d3dTexture, const FrameInfo& info, Enc
     bool produced = false;
     if (!drainOutput(output, produced) || !produced) return false;
 
-    // The MFT is authoritative when it marks a clean point. If the encoder
-    // accepted our forced-keyframe request but did not expose CleanPoint,
-    // preserve the request as a transport hint rather than relying on frame
-    // sequence numbers from the display driver.
     if (requestedKeyFrame && output.keyFrame) {
-        // already authoritative
     }
     return true;
 }
@@ -236,8 +250,6 @@ bool H264Encoder::drainOutput(EncodedAccessUnit& output, bool& produced) {
     MFT_OUTPUT_DATA_BUFFER data{};
     data.dwStreamID = 0;
 
-    // MFT_OUTPUT_STREAM_PROVIDES_SAMPLES means the encoder owns allocation.
-    // Otherwise the caller must provide the output sample.
     if ((streamInfo.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES) == 0) {
         const DWORD capacity = std::max<DWORD>(streamInfo.cbSize, 1024u);
         HRESULT hr = MFCreateMemoryBuffer(capacity, &outBuffer);
@@ -312,8 +324,6 @@ bool H264Encoder::normalizeAnnexB(const uint8_t* data, size_t size, std::vector<
         return true;
     }
 
-    // Convert length-prefixed NAL units to Annex-B. This also handles common
-    // AVCC output from hardware encoders.
     size_t pos = 0;
     while (pos + 4 <= size) {
         uint32_t n = (uint32_t(data[pos]) << 24) | (uint32_t(data[pos+1]) << 16) |
