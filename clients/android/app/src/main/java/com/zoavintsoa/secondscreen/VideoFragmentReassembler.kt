@@ -34,6 +34,7 @@ class VideoFragmentReassembler(
         if (b.int != 0x53535647) return null // SSVG
         if (b.get().toInt() != 1) return null
         val codec = b.get().toInt() and 0xff
+        if(codec != 1 && codec != 2) return null
         val flags = b.get().toInt() and 0xff
         b.get()
         val frameId = b.int.toLong() and 0xffffffffL
@@ -43,9 +44,10 @@ class VideoFragmentReassembler(
 
         if (count == 0 || index >= count || count > 4096) return null
         val payload = ByteArray(b.remaining()).also { b.get(it) }
+        if(payload.isEmpty()) return null
 
         val current = pending
-        if (current == null || current.frameId != frameId || current.count != count) {
+        if (current == null || current.frameId != frameId || current.count != count || current.codec != codec || current.flags != flags || current.timestampUs != timestampUs) {
             pending = Pending(frameId, codec, flags, timestampUs, count, arrayOfNulls(count), 0, nowMs)
         }
         val p = pending ?: return null
