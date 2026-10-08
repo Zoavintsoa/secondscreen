@@ -32,6 +32,22 @@
             android:contentDescription="État de SecondScreen" />
 
         <Button
+            android:id="@+id/connectionModeButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connexion : Auto"
+            android:minWidth="48dp"
+            android:minHeight="48dp" />
+
+        <Button
+            android:id="@+id/reconnectButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Rechercher"
+            android:minWidth="48dp"
+            android:minHeight="48dp" />
+
+        <Button
             android:id="@+id/aboutButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
