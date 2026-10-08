@@ -24,7 +24,7 @@ jobs:
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $msbuild = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
           if (-not $msbuild) { throw "MSBuild not found" }
-          & $msbuild native/windows-host/SecondScreenHost/SecondScreenHost.vcxproj /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot="$env:VCPKG_ROOT"
+          & $msbuild native/windows-host/SecondScreenHost/SecondScreenHost.vcxproj /p:Configuration=Release /p:Platform=x64 /p:VcpkgEnableManifest=true /p:VcpkgRoot="$env:VCPKG_ROOT" /p:VcpkgInstalledDir="$env:GITHUB_WORKSPACE\vcpkg_installed\x64-windows\"
 
   android-client:
     runs-on: ubuntu-latest
