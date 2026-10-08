@@ -21,7 +21,10 @@ void VideoStreamServer::acceptLoop(){
     while(running_){
         SOCKET s=accept(listenSocket_,nullptr,nullptr);
         if(s==INVALID_SOCKET){if(running_) continue; break;}
-        BOOL noDelay=TRUE; setsockopt(s,IPPROTO_TCP,TCP_NODELAY,reinterpret_cast<const char*>(&noDelay),sizeof(noDelay));
+        BOOL noDelay=TRUE;
+        setsockopt(s,IPPROTO_TCP,TCP_NODELAY,reinterpret_cast<const char*>(&noDelay),sizeof(noDelay));
+        DWORD sendTimeoutMs=1000;
+        setsockopt(s,SOL_SOCKET,SO_SNDTIMEO,reinterpret_cast<const char*>(&sendTimeoutMs),sizeof(sendTimeoutMs));
         std::lock_guard lock(socketMutex_);
         if(clientSocket_!=INVALID_SOCKET) closesocket(clientSocket_);
         clientSocket_=s; clientConnected_=true;
