@@ -7,12 +7,13 @@ namespace second_screen::frame_ipc {
 
 inline constexpr uint32_t kMagic = 0x49535353; // "SSSI"
 inline constexpr uint32_t kVersion = 1;
-inline constexpr wchar_t kStateName[] = L"Global\SecondScreen.FrameState";
-inline constexpr wchar_t kReadyEventName[] = L"Global\SecondScreen.FrameReady";
+
+inline constexpr wchar_t kStateName[] = L"Global\\SecondScreen.FrameState";
+inline constexpr wchar_t kReadyEventName[] = L"Global\\SecondScreen.FrameReady";
 inline constexpr wchar_t kTextureNames[3][64] = {
-    L"Global\SecondScreen.FrameTexture0",
-    L"Global\SecondScreen.FrameTexture1",
-    L"Global\SecondScreen.FrameTexture2"
+    L"Global\\SecondScreen.FrameTexture0",
+    L"Global\\SecondScreen.FrameTexture1",
+    L"Global\\SecondScreen.FrameTexture2"
 };
 
 struct alignas(8) SharedState {
