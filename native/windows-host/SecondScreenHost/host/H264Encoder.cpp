@@ -179,7 +179,8 @@ bool H264Encoder::encode(ID3D11Texture2D* d3dTexture, const FrameInfo& info, Enc
     if (!started_ || !d3dTexture) return false;
 
     if (!d3dConfigured_) {
-        if (FAILED(d3dTexture->GetDevice(&d3dDevice_)) || !d3dDevice_) return false;
+        d3dTexture->GetDevice(&d3dDevice_);
+        if (!d3dDevice_) return false;
         if (!converter_.initialize(d3dDevice_.Get(), width_, height_)) return false;
         if (FAILED(dxgiManager_->ResetDevice(d3dDevice_.Get(), dxgiManagerResetToken_))) return false;
         transform_->ProcessMessage(MFT_MESSAGE_SET_D3D_MANAGER, reinterpret_cast<ULONG_PTR>(dxgiManager_.Get()));
