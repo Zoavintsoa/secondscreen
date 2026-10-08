@@ -54,7 +54,7 @@ void releaseAccessoryLocked() {
 
 bool deviceRequest(IOUSBDeviceInterface182** device, UInt8 type, UInt8 request,
                    UInt16 value, UInt16 index, void* data, UInt16 length) {
-    IOUSBDevRequest req{};
+    IOUSBDevRequestTO req{};
     req.bmRequestType = type;
     req.bRequest = request;
     req.wValue = value;
@@ -62,7 +62,9 @@ bool deviceRequest(IOUSBDeviceInterface182** device, UInt8 type, UInt8 request,
     req.wLength = length;
     req.pData = data;
     req.wLenDone = 0;
-    return (*device)->DeviceRequestTO(device, reinterpret_cast<IOUSBDevRequestTO*>(&req)) == kIOReturnSuccess;
+    req.completionTimeout = 1000;
+    req.noDataTimeout = 1000;
+    return (*device)->DeviceRequestTO(device, &req) == kIOReturnSuccess;
 }
 
 bool sendString(IOUSBDeviceInterface182** device, UInt16 id, const char* value) {
