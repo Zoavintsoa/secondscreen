@@ -39,8 +39,8 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin XCBuildConfiguration section */
-    A00000000000000000000070 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenIPad/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.ipad; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 13.0; }; name = Debug; };
-    A00000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenIPad/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.ipad; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 13.0; }; name = Release; };
+    A00000000000000000000070 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenIPad/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.ipad; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 14.0; }; name = Debug; };
+    A00000000000000000000071 = {isa = XCBuildConfiguration; buildSettings = { ALWAYS_SEARCH_USER_PATHS = NO; CODE_SIGNING_ALLOWED = NO; INFOPLIST_FILE = SecondScreenIPad/Info.plist; PRODUCT_BUNDLE_IDENTIFIER = com.zoavintsoa.secondscreen.ipad; PRODUCT_NAME = "$(TARGET_NAME)"; SDKROOT = iphoneos; SWIFT_VERSION = 5.0; IPHONEOS_DEPLOYMENT_TARGET = 14.0; }; name = Release; };
     A00000000000000000000072 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Debug; };
     A00000000000000000000073 = {isa = XCBuildConfiguration; buildSettings = { CODE_SIGNING_ALLOWED = NO; }; name = Release; };
 /* End XCBuildConfiguration section */
