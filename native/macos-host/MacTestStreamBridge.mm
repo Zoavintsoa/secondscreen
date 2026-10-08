@@ -9,6 +9,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <net/if.h>
+#include <ifaddrs.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
@@ -166,28 +168,86 @@ void encoderCallback(void* refcon,
 }
 
 void discoveryLoop() {
-    const int fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (fd < 0) return;
-
-    int yes = 1;
-    setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes));
-
-    sockaddr_in destination{};
-    destination.sin_family = AF_INET;
-    destination.sin_port = htons(kDiscoveryPort);
-    destination.sin_addr.s_addr = htonl(INADDR_BROADCAST);
-
     const char payload[] =
         "{\"service\":\"secondscreen\",\"name\":\"SecondScreen iMac\","
         "\"mode\":\"test\",\"controlPort\":49152,\"videoPort\":49153,"
         "\"width\":1280,\"height\":720,\"fps\":30}";
 
     while (g.running.load()) {
-        sendto(fd, payload, sizeof(payload) - 1, 0,
-               reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+        ifaddrs* interfaces = nullptr;
+        if (getifaddrs(&interfaces) != 0) {
+            os_log_error(gLog, "getifaddrs failed: %{public}d", errno);
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+            continue;
+        }
+
+        for (ifaddrs* entry = interfaces; entry != nullptr && g.running.load(); entry = entry->ifa_next) {
+            if (!entry->ifa_addr || entry->ifa_addr->sa_family != AF_INET) continue;
+            if (!(entry->ifa_flags & IFF_UP) || !(entry->ifa_flags & IFF_RUNNING)) continue;
+            if (entry->ifa_flags & IFF_LOOPBACK) continue;
+
+            auto* address = reinterpret_cast<sockaddr_in*>(entry->ifa_addr);
+            auto* netmask = reinterpret_cast<sockaddr_in*>(entry->ifa_netmask);
+            auto* broadcast = reinterpret_cast<sockaddr_in*>(entry->ifa_broadaddr);
+
+            sockaddr_in calculated{};
+            if (!broadcast || broadcast->sin_addr.s_addr == 0) {
+                if (!netmask) continue;
+                calculated.sin_family = AF_INET;
+                calculated.sin_addr.s_addr =
+                    address->sin_addr.s_addr | ~netmask->sin_addr.s_addr;
+                broadcast = &calculated;
+            }
+
+            const int fd = socket(AF_INET, SOCK_DGRAM, 0);
+            if (fd < 0) {
+                os_log_error(gLog, "Discovery socket creation failed on %{public}s: %{public}d",
+                             entry->ifa_name, errno);
+                continue;
+            }
+
+            int yes = 1;
+            if (setsockopt(fd, SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes)) < 0) {
+                os_log_error(gLog, "SO_BROADCAST failed on %{public}s: %{public}d",
+                             entry->ifa_name, errno);
+                close(fd);
+                continue;
+            }
+
+            if (bind(fd, entry->ifa_addr, sizeof(sockaddr_in)) < 0) {
+                os_log_error(gLog, "Discovery bind failed on %{public}s: %{public}d",
+                             entry->ifa_name, errno);
+                close(fd);
+                continue;
+            }
+
+            sockaddr_in destination = *broadcast;
+            destination.sin_family = AF_INET;
+            destination.sin_port = htons(kDiscoveryPort);
+
+            char broadcastText[INET_ADDRSTRLEN] = {};
+            inet_ntop(AF_INET, &destination.sin_addr, broadcastText, sizeof(broadcastText));
+
+            const ssize_t sent = sendto(
+                fd, payload, sizeof(payload) - 1, 0,
+                reinterpret_cast<sockaddr*>(&destination), sizeof(destination));
+
+            if (sent < 0) {
+                os_log_error(gLog,
+                             "Discovery send failed on %{public}s to %{public}s:%{public}d: %{public}d",
+                             entry->ifa_name, broadcastText, kDiscoveryPort, errno);
+            } else {
+                os_log(gLog,
+                       "Discovery broadcast sent on %{public}s to %{public}s:%{public}d (%{public}ld bytes)",
+                       entry->ifa_name, broadcastText, kDiscoveryPort, (long)sent);
+            }
+
+            close(fd);
+        }
+
+        freeifaddrs(interfaces);
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    close(fd);
 }
 
 void serverLoop() {
