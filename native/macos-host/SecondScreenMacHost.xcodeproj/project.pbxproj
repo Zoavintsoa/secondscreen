@@ -24,8 +24,8 @@
     B10000000000000000000010 = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SecondScreenMacHost.app; sourceTree = BUILT_PRODUCTS_DIR; };
     B10000000000000000000011 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondScreenMacHostApp.swift; sourceTree = "<group>"; };
     B10000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-    B10000000000000000000013 = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = LegacyCapture.mm; sourceTree = "<group>"; };
-    B10000000000000000000014 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LegacyCapture.h; sourceTree = "<group>"; };
+    B10000000000000000000013 = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ../LegacyCapture.mm; sourceTree = "<group>"; };
+    B10000000000000000000014 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ../LegacyCapture.h; sourceTree = "<group>"; };
     B10000000000000000000015 = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ../VideoToolboxEncoder.mm; sourceTree = "<group>"; };
     B10000000000000000000016 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ../VideoToolboxEncoder.h; sourceTree = "<group>"; };
     B10000000000000000000017 = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
