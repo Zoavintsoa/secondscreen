@@ -61,44 +61,52 @@ class SecondScreenClient(
                     error("No H.264 decoder available on this Android device")
                 }
 
-                var cc=openControl(host)
-                if(!cc.hello(deviceId,"Android SecondScreen",DeviceCapabilitiesProbe.helloJson(capabilities))){
-                    error("Control HELLO rejected")
-                }
+                val testMode = host.mode == "test"
+                if(testMode){
+                    streamConfig=streamConfig.copy(
+                        width=host.width,
+                        height=host.height,
+                        fps=host.fps,
+                        codec=1
+                    ).normalized()
+                    onStatus("SecondScreen — test iMac détecté, connexion vidéo…")
+                } else {
+                    var cc=openControl(host)
+                    if(!cc.hello(deviceId,"Android SecondScreen",DeviceCapabilitiesProbe.helloJson(capabilities))){
+                        error("Control HELLO rejected")
+                    }
 
-                var authenticated=false
-                val stored=preferences.getString("sessionToken",null)
-                if(stored!=null){
-                    val result=runCatching{cc.authenticate(stored)}.getOrNull()
-                    if(result?.authenticated==true){
-                        authenticated=true
-                        result.streamConfig?.let{streamConfig=it.normalized()}
-                    } else {
-                        // An invalid/expired token causes the host session to close.
-                        // Never reuse that TCP socket for a new pairing attempt.
-                        controlClient?.close()
-                        controlClient=null
-                        controlSocket=null
-                        cc=openControl(host)
-                        if(!cc.hello(deviceId,"Android SecondScreen",DeviceCapabilitiesProbe.helloJson(capabilities))){
-                            error("Control HELLO rejected after token reset")
+                    var authenticated=false
+                    val stored=preferences.getString("sessionToken",null)
+                    if(stored!=null){
+                        val result=runCatching{cc.authenticate(stored)}.getOrNull()
+                        if(result?.authenticated==true){
+                            authenticated=true
+                            result.streamConfig?.let{streamConfig=it.normalized()}
+                        } else {
+                            controlClient?.close()
+                            controlClient=null
+                            controlSocket=null
+                            cc=openControl(host)
+                            if(!cc.hello(deviceId,"Android SecondScreen",DeviceCapabilitiesProbe.helloJson(capabilities))){
+                                error("Control HELLO rejected after token reset")
+                            }
                         }
                     }
-                }
 
-                if(!authenticated){
-                    onStatus("SecondScreen — appairage requis")
-                    val code=onPairingRequired(host.name) ?: error("Pairing cancelled")
-                    val result=cc.pair(code.trim())
-                    if(!result.authenticated || result.sessionToken==null) error("Pairing rejected")
-                    preferences.edit().putString("sessionToken",result.sessionToken).apply()
-                    result.streamConfig?.let{streamConfig=it.normalized()}
-                    authenticated=true
+                    if(!authenticated){
+                        onStatus("SecondScreen — appairage requis")
+                        val code=onPairingRequired(host.name) ?: error("Pairing cancelled")
+                        val result=cc.pair(code.trim())
+                        if(!result.authenticated || result.sessionToken==null) error("Pairing rejected")
+                        preferences.edit().putString("sessionToken",result.sessionToken).apply()
+                        result.streamConfig?.let{streamConfig=it.normalized()}
+                    }
                 }
 
                 awaitingKeyframe=true
                 reassembler.reset()
-                onStatus("SecondScreen — sécurisé, connexion vidéo…")
+                onStatus(if(testMode) "SecondScreen — iMac connecté" else "SecondScreen — sécurisé, connexion vidéo…")
                 val s=Socket().apply{
                     tcpNoDelay=true
                     connect(InetSocketAddress(host.address,host.videoPort),1500)
