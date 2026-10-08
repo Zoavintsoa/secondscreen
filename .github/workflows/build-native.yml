@@ -64,8 +64,9 @@ jobs:
       - name: Package Android APK
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/artifacts/android"
-          APK="$(find "$GITHUB_WORKSPACE/clients/android/build/outputs/apk" -type f -name '*.apk' | head -n 1)"
+          APK="$(find "$GITHUB_WORKSPACE/clients/android/app/build/outputs/apk" -type f -name '*.apk' -print -quit)"
           test -n "$APK"
           cp "$APK" "$GITHUB_WORKSPACE/artifacts/android/SecondScreen-Android.apk"
       - name: Upload Android artifact
@@ -90,7 +91,7 @@ jobs:
       - name: Package macOS host
         run: |
           set -euo pipefail
-          APP="$(find "$GITHUB_WORKSPACE" -type d -path '*/Build/Products/Release/SecondScreenMacHost.app' -print -quit)"
+          APP="$(find "$GITHUB_WORKSPACE" -type d -path '*/build/Release/SecondScreenMacHost.app' -print -quit)"
           test -n "$APP"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$GITHUB_WORKSPACE/SecondScreen-macOS.zip"
       - name: Upload macOS artifact
@@ -105,7 +106,7 @@ jobs:
       - name: Package iPadOS client
         run: |
           set -euo pipefail
-          APP="$(find "$GITHUB_WORKSPACE" -type d -path '*/Build/Products/Release-iphoneos/SecondScreenIPad.app' -print -quit)"
+          APP="$(find "$GITHUB_WORKSPACE" -type d -path '*/build/Release-iphoneos/SecondScreenIPad.app' -print -quit)"
           test -n "$APP"
           ditto -c -k --sequesterRsrc --keepParent "$APP" "$GITHUB_WORKSPACE/SecondScreen-iPadOS.zip"
       - name: Upload iPadOS artifact
