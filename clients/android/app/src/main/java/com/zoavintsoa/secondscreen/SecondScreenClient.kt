@@ -54,6 +54,10 @@ class SecondScreenClient(
     private fun connectLoop(){
         while(running.get()){
             try{
+                reconnectRequested.set(false)
+                if (_connectionMode == ConnectionMode.USB) {
+                    error("USB transport is not implemented yet")
+                }
                 onStatus("SecondScreen — recherche d’un hôte…")
                 val host=discoverHost() ?: error("No SecondScreen host found")
                 val capabilities=DeviceCapabilitiesProbe.probe(context)
@@ -112,6 +116,10 @@ class SecondScreenClient(
                     connect(InetSocketAddress(host.address,host.videoPort),1500)
                 }
                 socket=s
+                preferences.edit()
+                    .putString("lastHostAddress", host.address)
+                    .putString("lastHostName", host.name)
+                    .apply()
                 consumeVideo(DataInputStream(BufferedInputStream(s.getInputStream())))
             }catch(t:Throwable){
                 onStatus("SecondScreen — reconnexion…")
@@ -136,9 +144,37 @@ class SecondScreenClient(
         decode(frame.codec,streamConfig.width,streamConfig.height,frame.annexB,frame.timestampUs,keyFrame)
     }
 
-    private fun discoverHost():HostAdvertisement?{
-        discoveredHost=DiscoveryClient().discover()?:discoveredHost
-        return discoveredHost
+    private fun discoverHost():HostAdvertisement? {
+        val cachedAddress = preferences.getString("lastHostAddress", null)
+        val cachedName = preferences.getString("lastHostName", "SecondScreen Host") ?: "SecondScreen Host"
+
+        val fresh = DiscoveryClient().discover(5000)
+        if (fresh != null) {
+            discoveredHost = fresh
+            return fresh
+        }
+
+        if (_connectionMode == ConnectionMode.AUTO && cachedAddress != null) {
+            val cached = HostAdvertisement(
+                address = cachedAddress,
+                name = cachedName,
+                controlPort = 49152,
+                videoPort = 49153,
+                mode = "test"
+            )
+            if (probeVideo(cached)) return cached
+        }
+        return null
+    }
+
+    private fun probeVideo(host: HostAdvertisement): Boolean {
+        return runCatching {
+            Socket().use {
+                it.tcpNoDelay = true
+                it.connect(InetSocketAddress(host.address, host.videoPort), 500)
+            }
+            true
+        }.getOrDefault(false)
     }
 
     private fun consumeVideo(input:DataInputStream){
