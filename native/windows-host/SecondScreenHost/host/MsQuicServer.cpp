@@ -22,6 +22,10 @@
 
 namespace second_screen {
 
+#if SECOND_SCREEN_HAS_MSQUIC
+struct ConnectionContext;
+#endif
+
 struct MsQuicServer::Impl {
     Config config;
     quic::TransportCallbacks callbacks;
