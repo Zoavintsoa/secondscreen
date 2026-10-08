@@ -26,8 +26,8 @@
     B10000000000000000000012 = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
     B10000000000000000000013 = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = LegacyCapture.mm; sourceTree = "<group>"; };
     B10000000000000000000014 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = LegacyCapture.h; sourceTree = "<group>"; };
-    B10000000000000000000015 = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = VideoToolboxEncoder.mm; sourceTree = "<group>"; };
-    B10000000000000000000016 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = VideoToolboxEncoder.h; sourceTree = "<group>"; };
+    B10000000000000000000015 = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ../VideoToolboxEncoder.mm; sourceTree = "<group>"; };
+    B10000000000000000000016 = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ../VideoToolboxEncoder.h; sourceTree = "<group>"; };
     B10000000000000000000017 = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
     B10000000000000000000018 = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
     B10000000000000000000019 = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
