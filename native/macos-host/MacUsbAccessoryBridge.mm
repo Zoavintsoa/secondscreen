@@ -44,8 +44,8 @@ void releaseAccessoryLocked() {
         g.iface = nullptr;
     }
     if (g.device) {
-        g.(*device)->USBDeviceClose(g.device);
-        g.(*device)->Release(g.device);
+        (*g.device)->USBDeviceClose(g.device);
+        (*g.device)->Release(g.device);
         g.device = nullptr;
     }
     g.inPipe = g.outPipe = 0;
@@ -144,7 +144,7 @@ bool openAccessoryDevice(io_service_t service) {
                     if (direction == kUSBIn && !cin) cin = pipe;
                     if (direction == kUSBOut && !cout) cout = pipe;
                 }
-                if (cin && cout && (*candidate)->USBInterfaceOpenSeize(candidate) == kIOReturnSuccess) {
+                if (cin && cout && (*candidate)->USBInterfaceOpen(candidate) == kIOReturnSuccess) {
                     chosen = candidate; inPipe = cin; outPipe = cout; break;
                 }
             }
