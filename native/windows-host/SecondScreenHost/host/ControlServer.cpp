@@ -27,6 +27,31 @@ ControlServer::~ControlServer() {
     stop();
 }
 
+void ControlServer::stop() {
+    if (!running_.exchange(false)) return;
+
+    SOCKET listenSocket = INVALID_SOCKET;
+    SOCKET clientSocket = INVALID_SOCKET;
+    {
+        std::lock_guard lock(clientMutex_);
+        listenSocket = listenSocket_;
+        listenSocket_ = INVALID_SOCKET;
+        clientSocket = clientSocket_;
+        clientSocket_ = INVALID_SOCKET;
+    }
+
+    if (listenSocket != INVALID_SOCKET) closesocket(listenSocket);
+    if (clientSocket != INVALID_SOCKET) {
+        shutdown(clientSocket, SD_BOTH);
+        closesocket(clientSocket);
+    }
+
+    if (acceptThread_ && acceptThread_->joinable()) {
+        acceptThread_->join();
+    }
+    acceptThread_.reset();
+}
+
 bool ControlServer::start(uint16_t port) {
     if (running_.exchange(true)) return true;
 
