@@ -29,8 +29,8 @@
     B10000000000000000000017 = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
     B10000000000000000000018 = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
     B10000000000000000000019 = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-    B1000000000000000000001A = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MacTestStreamBridge.mm; sourceTree = "<group>"; };
-    B1000000000000000000001B = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = MacTestStreamBridge.h; sourceTree = "<group>"; };
+    B1000000000000000000001A = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = ../MacTestStreamBridge.mm; sourceTree = "<group>"; };
+    B1000000000000000000001B = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ../MacTestStreamBridge.h; sourceTree = "<group>"; };
     B1000000000000000000001C = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SecondScreenMacHost-Bridging-Header.h; sourceTree = "<group>"; };
     B1000000000000000000001D = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
     B1000000000000000000001E = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOSurface.framework; path = System/Library/Frameworks/IOSurface.framework; sourceTree = SDKROOT; };
