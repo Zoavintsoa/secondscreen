@@ -38,6 +38,7 @@ std::vector<std::vector<uint8_t>> fragmentAccessUnit(
     const std::vector<uint8_t>& annexB,
     uint32_t maxDatagramSize) {
     if (maxDatagramSize <= kHeaderSize ||
+        (codec != 1 && codec != 2) ||
         annexB.empty() ||
         annexB.size() > std::numeric_limits<uint32_t>::max()) {
         return {};
