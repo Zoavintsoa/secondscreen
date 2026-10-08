@@ -60,7 +60,9 @@ ParseStatus ControlFrameParser::push(
         return ParseStatus::Invalid;
     }
 
-    buffer_.insert(buffer_.end(), data, data + size);
+    if (size > 0) {
+        buffer_.insert(buffer_.end(), data, data + size);
+    }
 
     if (buffer_.size() < kHeaderSize) return ParseStatus::NeedMoreData;
 
