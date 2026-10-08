@@ -53,7 +53,7 @@ static const struct IndirectSampleMonitor s_SampleMonitors[] =
             { 1920, 1080,  60 },
             { 1024,  768,  60 },
         },
-        0
+        1
     },
     // Modified EDID from Lenovo Y27fA
     {
