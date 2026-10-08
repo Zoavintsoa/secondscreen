@@ -6,7 +6,7 @@
 #include <d3d11.h>
 #include <d3d11_1.h>
 #include <codecapi.h>
-#include <icodecapi.h>
+#include <strmif.h>
 #include <mftransform.h>
 #include <mfidl.h>
 
