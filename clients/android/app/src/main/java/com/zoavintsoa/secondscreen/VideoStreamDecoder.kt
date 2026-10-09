@@ -17,7 +17,12 @@ class VideoStreamDecoder(private val surface: SurfaceHolder) {
         val d = decoder ?: return
         val index = d.dequeueInputBuffer(10_000)
         if (index >= 0) {
-            val buffer = d.getInputBuffer(index) ?: return
+            val buffer = d.getInputBuffer(index) ?: run {
+                // Return the dequeued slot so the codec cannot remain starved if a
+                // device temporarily fails to expose its input ByteBuffer.
+                runCatching { d.queueInputBuffer(index, 0, 0, 0L, 0) }
+                return
+            }
             if (accessUnit.size > buffer.capacity()) {
                 runCatching { configure(codec, w, h) }.getOrElse { return }
                 val replacement = decoder ?: return
@@ -58,10 +63,16 @@ class VideoStreamDecoder(private val surface: SurfaceHolder) {
             setInteger(MediaFormat.KEY_PRIORITY, 0)
             setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 16 * 1024 * 1024)
         }
-        decoder = MediaCodec.createDecoderByType(mime).also {
-            it.configure(format, surface.surface, null, 0)
-            it.start()
+        val created = MediaCodec.createDecoderByType(mime)
+        try {
+            created.configure(format, surface.surface, null, 0)
+            created.start()
+        } catch (failure: Throwable) {
+            runCatching { created.stop() }
+            runCatching { created.release() }
+            throw failure
         }
+        decoder = created
         codecId = codec
         width = w
         height = h
