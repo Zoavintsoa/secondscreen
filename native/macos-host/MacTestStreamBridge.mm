@@ -33,6 +33,9 @@ constexpr int kBitrate = 5 * 1000 * 1000;
 
 struct State {
     std::atomic<bool> running{false};
+    // Serializes launch/activation retries so capture permission can be granted
+    // after network discovery has already started.
+    std::mutex startMutex;
     std::thread discoveryThread;
     std::thread serverThread;
     CGDisplayStreamRef stream = nullptr;
@@ -410,39 +413,46 @@ void startCapture() {
 } // namespace
 
 extern "C" void SecondScreenStartTestStream(void) {
-    if (g.running.exchange(true)) return;
+    std::lock_guard<std::mutex> startLock(g.startMutex);
+    const bool wasRunning = g.running.exchange(true);
 
-    os_log(gLog, "SecondScreenStartTestStream");
+    if (!wasRunning) {
+        os_log(gLog, "Starting SecondScreen network discovery independently of screen capture");
+        // Start discovery and the TCP listener even when macOS screen-capture
+        // permission has not yet been granted. Otherwise Android can never find
+        // the host, so it cannot tell the user what is wrong.
+        g.discoveryThread = std::thread(discoveryLoop);
+        g.serverThread = std::thread(serverLoop);
+        SecondScreenStartUsbAccessory();
+    }
+
+    // applicationDidBecomeActive calls this again after the user returns from
+    // System Settings. Keep discovery alive and retry only the capture startup.
+    if (g.encoder || g.stream) return;
 
     if (!CGPreflightScreenCaptureAccess()) {
-        os_log(gLog, "Screen Recording permission is not granted; requesting access");
+        os_log(gLog, "Screen Recording permission is not granted; requesting access while network discovery remains active");
         const bool requested = CGRequestScreenCaptureAccess();
         os_log(gLog, "CGRequestScreenCaptureAccess returned: %{public}s", requested ? "true" : "false");
-        g.running = false;
         return;
     }
 
     if (!startEncoder()) {
-        g.running = false;
+        os_log_error(gLog, "Capture startup deferred; host discovery remains available for retry");
         return;
     }
 
-    g.discoveryThread = std::thread(discoveryLoop);
-    g.serverThread = std::thread(serverLoop);
-    SecondScreenStartUsbAccessory();
     startCapture();
 
     if (!g.stream) {
-        os_log_error(gLog, "Test stream aborted: display capture could not be created");
-        g.running = false;
-        if (g.discoveryThread.joinable()) g.discoveryThread.join();
+        os_log_error(gLog, "Screen capture unavailable; host discovery and TCP listener remain active");
         if (g.encoder) {
             VTCompressionSessionInvalidate(g.encoder);
             CFRelease(g.encoder);
             g.encoder = nullptr;
         }
     } else {
-        os_log(gLog, "SecondScreen test stream is running");
+        os_log(gLog, "SecondScreen capture stream is running");
     }
 }
 
