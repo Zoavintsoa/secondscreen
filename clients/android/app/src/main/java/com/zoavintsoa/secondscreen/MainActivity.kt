@@ -139,7 +139,18 @@ class MainActivity : ComponentActivity() {
                 "Avant d’utiliser SecondScreen, veuillez consulter et accepter les Conditions d’utilisation et la Politique de confidentialité. " +
                     "Le fonctionnement normal est local/LAN et aucune création de compte n’est requise."
             )
-            .setNeutralButton("Conditions") { _, _ -> showLegalDocument("Conditions d’utilisation", TERMS) }
+            .setNeutralButton("Documents légaux") { _, _ ->
+                AlertDialog.Builder(this)
+                    .setTitle("Documents légaux")
+                    .setItems(arrayOf("Conditions d’utilisation", "Politique de confidentialité")) { _, which ->
+                        val title = if (which == 0) "Conditions d’utilisation" else "Politique de confidentialité"
+                        val body = if (which == 0) TERMS else PRIVACY
+                        showLegalDocument(title, body) { showLegalNotice() }
+                    }
+                    .setNegativeButton("Retour") { _, _ -> showLegalNotice() }
+                    .setCancelable(false)
+                    .show()
+            }
             .setNegativeButton("Quitter") { _, _ -> finish() }
             .setPositiveButton("J’accepte") { _, _ ->
                 getPreferences(Context.MODE_PRIVATE)
@@ -173,7 +184,7 @@ class MainActivity : ComponentActivity() {
             .show()
     }
 
-    private fun showLegalDocument(title: String, body: String) {
+    private fun showLegalDocument(title: String, body: String, onClosed: (() -> Unit)? = null) {
         val textView = TextView(this).apply {
             text = body
             textSize = 14f
@@ -184,7 +195,8 @@ class MainActivity : ComponentActivity() {
         AlertDialog.Builder(this)
             .setTitle(title)
             .setView(scroll)
-            .setPositiveButton("Fermer", null)
+            .setPositiveButton("Fermer") { _, _ -> onClosed?.invoke() }
+            .setOnCancelListener { onClosed?.invoke() }
             .show()
     }
 
