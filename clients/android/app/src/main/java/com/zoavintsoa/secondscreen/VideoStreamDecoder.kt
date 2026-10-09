@@ -79,12 +79,14 @@ class VideoStreamDecoder(private val surface: SurfaceHolder) {
             }
 
             drainOutput(active)
-        } catch (_: IllegalStateException) {
+        } catch (t: IllegalStateException) {
             // MediaCodec can enter an invalid state after a surface or driver
-            // change. Drop the instance and allow the stream to recover cleanly.
+            // change. Drop the instance and let the session request a keyframe.
             release()
-        } catch (_: IllegalArgumentException) {
+            throw t
+        } catch (t: IllegalArgumentException) {
             release()
+            throw t
         }
     }
 
