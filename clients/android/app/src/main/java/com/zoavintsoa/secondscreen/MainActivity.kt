@@ -36,10 +36,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_main)
-        registerReceiver(usbPermissionReceiver, IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED)
-        requestUsbPermissionIfNeeded()
         status = findViewById(R.id.status)
         connectionModeButton = findViewById(R.id.connectionModeButton)
+        registerReceiver(usbPermissionReceiver, IntentFilter(ACTION_USB_PERMISSION), Context.RECEIVER_NOT_EXPORTED)
+        requestUsbPermissionIfNeeded()
 
         findViewById<android.widget.Button>(R.id.aboutButton).setOnClickListener {
             showAbout()
@@ -91,6 +91,7 @@ class MainActivity : ComponentActivity() {
             { message -> runOnUiThread { status.text = message } },
             { hostName -> requestPairingCode(hostName) }
         )
+        updateConnectionModeButton()
         surface.holder.addCallback(client)
     }
 
