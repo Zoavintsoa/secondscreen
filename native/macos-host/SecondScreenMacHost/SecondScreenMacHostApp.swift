@@ -125,6 +125,36 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         startSharing()
+        refreshStreamStatus()
+    }
+
+    private func refreshStreamStatus() {
+        if sharingEnabled {
+            switch SecondScreenGetTestStreamStatus() {
+            case 0:
+                statusLabel?.stringValue = "Partage arrêté"
+            case 1:
+                statusLabel?.stringValue = "Initialisation du flux…"
+            case 2:
+                statusLabel?.stringValue = "Prêt — en attente d’un appareil Android"
+            case 3:
+                statusLabel?.stringValue = "Appareil Android connecté — flux actif"
+            case 4:
+                statusLabel?.stringValue = "Autorisation d’enregistrement de l’écran manquante"
+            case 5:
+                statusLabel?.stringValue = "Échec de l’initialisation de l’encodeur vidéo"
+            case 6:
+                statusLabel?.stringValue = "Échec du démarrage de la capture d’écran"
+            case 7:
+                statusLabel?.stringValue = "Port vidéo indisponible — vérifiez qu’il n’est pas déjà utilisé"
+            default:
+                statusLabel?.stringValue = "État du flux inconnu"
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.refreshStreamStatus()
+        }
     }
 
     @objc private func displayModeChanged(_ sender: NSSegmentedControl) {
