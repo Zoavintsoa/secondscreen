@@ -107,26 +107,32 @@ std::vector<std::uint8_t> annexBFromSample(CMSampleBufferRef sample, bool keyfra
 
     CMBlockBufferRef block = CMSampleBufferGetDataBuffer(sample);
     if (!block) return {};
-    size_t length = 0;
-    char* data = nullptr;
-    if (CMBlockBufferGetDataPointer(block, 0, nullptr, &length, &data) != kCMBlockBufferNoErr ||
-        !data) return {};
+
+    // CMBlockBufferGetDataPointer can fail when a sample is backed by multiple
+    // non-contiguous memory blocks. CopyDataBytes handles both contiguous and
+    // non-contiguous buffers and keeps the parser independent of encoder layout.
+    const size_t length = CMBlockBufferGetDataLength(block);
+    if (length == 0 || length > 16 * 1024 * 1024) return {};
+    std::vector<std::uint8_t> data(length);
+    if (CMBlockBufferCopyDataBytes(block, 0, length, data.data()) != kCMBlockBufferNoErr) {
+        return {};
+    }
 
     size_t offset = 0;
     while (offset + 4 <= length) {
-        std::uint32_t nalLength =
-            (static_cast<std::uint8_t>(data[offset]) << 24) |
-            (static_cast<std::uint8_t>(data[offset + 1]) << 16) |
-            (static_cast<std::uint8_t>(data[offset + 2]) << 8) |
-            static_cast<std::uint8_t>(data[offset + 3]);
+        const std::uint32_t nalLength =
+            (static_cast<std::uint32_t>(data[offset]) << 24) |
+            (static_cast<std::uint32_t>(data[offset + 1]) << 16) |
+            (static_cast<std::uint32_t>(data[offset + 2]) << 8) |
+            static_cast<std::uint32_t>(data[offset + 3]);
         offset += 4;
-        if (nalLength == 0 || offset + nalLength > length) return {};
+        if (nalLength == 0 || static_cast<size_t>(nalLength) > length - offset) return {};
         putStartCode(out);
-        out.insert(out.end(),
-                   reinterpret_cast<std::uint8_t*>(data) + offset,
-                   reinterpret_cast<std::uint8_t*>(data) + offset + nalLength);
+        out.insert(out.end(), data.begin() + static_cast<std::ptrdiff_t>(offset),
+                   data.begin() + static_cast<std::ptrdiff_t>(offset + nalLength));
         offset += nalLength;
     }
+    if (offset != length) return {};
     return out;
 }
 
@@ -391,7 +397,9 @@ void startCapture() {
                                                  &pixelBuffer) != kCVReturnSuccess ||
                 !pixelBuffer) return;
 
-            CMTime pts = CMTimeMake(static_cast<int64_t>(displayTime), 1000000000);
+            // CGDisplayStream's displayTime uses the host clock's system units, not
+    // nanoseconds. Convert it with CoreMedia so VideoToolbox receives valid PTS.
+    CMTime pts = CMClockMakeHostTimeFromSystemUnits(displayTime);
             VTEncodeInfoFlags flags = 0;
             VTCompressionSessionEncodeFrame(g.encoder, pixelBuffer, pts,
                                             CMTimeMake(1, kFps), nullptr, nullptr, &flags);
@@ -405,6 +413,11 @@ void startCapture() {
     }
     const CGError startStatus = CGDisplayStreamStart(g.stream);
     os_log(gLog, "CGDisplayStreamStart returned: %{public}d", (int)startStatus);
+    if (startStatus != kCGErrorSuccess) {
+        os_log_error(gLog, "CGDisplayStreamStart failed; releasing capture stream");
+        CFRelease(g.stream);
+        g.stream = nullptr;
+    }
 }
 
 } // namespace
@@ -433,21 +446,19 @@ extern "C" void SecondScreenStartTestStream(void) {
     startCapture();
 
     if (!g.stream) {
-        os_log_error(gLog, "Test stream aborted: display capture could not be created");
-        g.running = false;
-        if (g.discoveryThread.joinable()) g.discoveryThread.join();
-        if (g.encoder) {
-            VTCompressionSessionInvalidate(g.encoder);
-            CFRelease(g.encoder);
-            g.encoder = nullptr;
-        }
+        os_log_error(gLog, "Test stream aborted: display capture could not be started");
+        // Use the same complete cleanup path as a normal stop. In particular,
+        // also join the server thread and stop the USB worker after partial startup.
+        SecondScreenStopTestStream();
     } else {
         os_log(gLog, "SecondScreen test stream is running");
     }
 }
 
 extern "C" void SecondScreenStopTestStream(void) {
-    if (!g.running.exchange(false)) return;
+    // Do not return just because startup already cleared running: startup can
+    // fail after creating worker threads, and those threads still need joining.
+    g.running.exchange(false);
 
     if (g.stream) {
         CGDisplayStreamStop(g.stream);
@@ -455,6 +466,9 @@ extern "C" void SecondScreenStopTestStream(void) {
         g.stream = nullptr;
     }
     if (g.encoder) {
+        // Drain any callbacks already queued by VideoToolbox before invalidating
+        // and releasing the compression session.
+        VTCompressionSessionCompleteFrames(g.encoder, kCMTimeInvalid);
         VTCompressionSessionInvalidate(g.encoder);
         CFRelease(g.encoder);
         g.encoder = nullptr;
