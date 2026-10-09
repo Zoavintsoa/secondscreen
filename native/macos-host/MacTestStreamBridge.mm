@@ -4,6 +4,7 @@
 #import <CoreVideo/CoreVideo.h>
 #import <VideoToolbox/VideoToolbox.h>
 #import <IOSurface/IOSurface.h>
+#import <mach/mach_time.h>
 #import <os/log.h>
 
 #include <arpa/inet.h>
@@ -107,26 +108,30 @@ std::vector<std::uint8_t> annexBFromSample(CMSampleBufferRef sample, bool keyfra
 
     CMBlockBufferRef block = CMSampleBufferGetDataBuffer(sample);
     if (!block) return {};
-    size_t length = 0;
-    char* data = nullptr;
-    if (CMBlockBufferGetDataPointer(block, 0, nullptr, &length, &data) != kCMBlockBufferNoErr ||
-        !data) return {};
+    const size_t length = CMBlockBufferGetDataLength(block);
+    if (length < 4 || length > 16 * 1024 * 1024) return {};
+
+    // CMBlockBuffer may be segmented; do not assume GetDataPointer exposes
+    // the entire access unit as one contiguous memory region.
+    std::vector<std::uint8_t> data(length);
+    if (CMBlockBufferCopyDataBytes(block, 0, length, data.data()) != kCMBlockBufferNoErr)
+        return {};
 
     size_t offset = 0;
     while (offset + 4 <= length) {
-        std::uint32_t nalLength =
-            (static_cast<std::uint8_t>(data[offset]) << 24) |
-            (static_cast<std::uint8_t>(data[offset + 1]) << 16) |
-            (static_cast<std::uint8_t>(data[offset + 2]) << 8) |
-            static_cast<std::uint8_t>(data[offset + 3]);
+        const std::uint32_t nalLength =
+            (static_cast<std::uint32_t>(data[offset]) << 24) |
+            (static_cast<std::uint32_t>(data[offset + 1]) << 16) |
+            (static_cast<std::uint32_t>(data[offset + 2]) << 8) |
+            static_cast<std::uint32_t>(data[offset + 3]);
         offset += 4;
         if (nalLength == 0 || offset + nalLength > length) return {};
         putStartCode(out);
-        out.insert(out.end(),
-                   reinterpret_cast<std::uint8_t*>(data) + offset,
-                   reinterpret_cast<std::uint8_t*>(data) + offset + nalLength);
+        out.insert(out.end(), data.begin() + static_cast<std::ptrdiff_t>(offset),
+                   data.begin() + static_cast<std::ptrdiff_t>(offset + nalLength));
         offset += nalLength;
     }
+    if (offset != length) return {};
     return out;
 }
 
@@ -143,7 +148,12 @@ void encoderCallback(void* refcon,
 
     const bool keyframe = isKeyframe(sample);
     auto payload = annexBFromSample(sample, keyframe);
-    if (payload.empty() || payload.size() > 16 * 1024 * 1024) return;
+    if (payload.empty() || payload.size() > 16 * 1024 * 1024) {
+        static std::atomic<unsigned> invalidPayloads{0};
+        const unsigned n = ++invalidPayloads;
+        if (n <= 5) os_log_error(gLog, "H.264 sample produced invalid Annex-B payload (count=%{public}u)", n);
+        return;
+    }
 
     const auto pts = CMSampleBufferGetPresentationTimeStamp(sample);
     const std::uint64_t timestampUs =
@@ -170,7 +180,11 @@ void encoderCallback(void* refcon,
     // USB is an additional transport. A connected Android accessory receives the
     // exact same SSVF frame, so decoding/recovery stays identical across LAN/USB.
     SecondScreenUsbAccessorySend(frame.data(), frame.size());
-    ++g.frameId;
+    const std::uint32_t sentFrame = ++g.frameId;
+    if (sentFrame == 1 || sentFrame % 60 == 0) {
+        os_log(gLog, "Encoded video frames: %{public}u (latest payload %{public}lu bytes, keyframe=%{public}s)",
+               sentFrame, (unsigned long)payload.size(), keyframe ? "yes" : "no");
+    }
 }
 
 void discoveryLoop() {
@@ -384,18 +398,51 @@ void startCapture() {
           CGDisplayStreamUpdateRef updateRef) {
             (void)updateRef;
             if (status != kCGDisplayStreamFrameStatusFrameComplete || !frameSurface ||
-                !g.encoder || !g.running.load()) return;
+                !g.encoder || !g.running.load()) {
+                static std::atomic<unsigned> skippedFrames{0};
+                const unsigned n = ++skippedFrames;
+                if (n <= 5) os_log(gLog, "Display capture callback skipped frame (status=%{public}d, surface=%{public}s)",
+                                   (int)status, frameSurface ? "yes" : "no");
+                return;
+            }
 
             CVPixelBufferRef pixelBuffer = nullptr;
-            if (CVPixelBufferCreateWithIOSurface(kCFAllocatorDefault, frameSurface, nullptr,
-                                                 &pixelBuffer) != kCVReturnSuccess ||
-                !pixelBuffer) return;
+            const CVReturn pixelStatus = CVPixelBufferCreateWithIOSurface(
+                kCFAllocatorDefault, frameSurface, nullptr, &pixelBuffer);
+            if (pixelStatus != kCVReturnSuccess || !pixelBuffer) {
+                static std::atomic<unsigned> pixelFailures{0};
+                const unsigned n = ++pixelFailures;
+                if (n <= 5) os_log_error(gLog, "CVPixelBufferCreateWithIOSurface failed: %{public}d", (int)pixelStatus);
+                return;
+            }
 
-            CMTime pts = CMTimeMake(static_cast<int64_t>(displayTime), 1000000000);
+            // CGDisplayStream's displayTime is in mach absolute-time units,
+            // not nanoseconds. Convert it before constructing the CoreMedia PTS.
+            static mach_timebase_info_data_t timebase = [] {
+                mach_timebase_info_data_t info{};
+                mach_timebase_info(&info);
+                return info;
+            }();
+            const uint64_t timestampNs =
+                timebase.denom != 0
+                    ? (displayTime * static_cast<uint64_t>(timebase.numer)) / timebase.denom
+                    : displayTime;
+            const CMTime pts = CMTimeMake(static_cast<int64_t>(timestampNs), 1000000000);
             VTEncodeInfoFlags flags = 0;
-            VTCompressionSessionEncodeFrame(g.encoder, pixelBuffer, pts,
-                                            CMTimeMake(1, kFps), nullptr, nullptr, &flags);
+            const OSStatus encodeStatus = VTCompressionSessionEncodeFrame(
+                g.encoder, pixelBuffer, pts, CMTimeMake(1, kFps), nullptr, nullptr, &flags);
             CVPixelBufferRelease(pixelBuffer);
+
+            static std::atomic<unsigned> capturedFrames{0};
+            const unsigned n = ++capturedFrames;
+            if (n == 1 || n % 60 == 0) {
+                os_log(gLog, "Captured display frames: %{public}u", n);
+            }
+            if (encodeStatus != noErr) {
+                static std::atomic<unsigned> encodeFailures{0};
+                const unsigned failures = ++encodeFailures;
+                if (failures <= 10) os_log_error(gLog, "VTCompressionSessionEncodeFrame failed: %{public}d", (int)encodeStatus);
+            }
         });
 
     if (properties) CFRelease(properties);
