@@ -23,10 +23,12 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         content.wantsLayer = true
         content.layer?.backgroundColor = NSColor(calibratedRed: 0.055, green: 0.065, blue: 0.085, alpha: 1).cgColor
 
-        let icon = NSImageView(image: NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: "SecondScreen") ?? NSImage())
+        let icon = NSImageView(frame: NSRect(x: 42, y: 385, width: 48, height: 48))
+        if #available(macOS 11.0, *) {
+            icon.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: "SecondScreen")
+        }
         icon.contentTintColor = accent
         icon.imageScaling = .scaleProportionallyUpOrDown
-        icon.frame = NSRect(x: 42, y: 385, width: 48, height: 48)
         content.addSubview(icon)
 
         let title = NSTextField(labelWithString: "SecondScreen")
