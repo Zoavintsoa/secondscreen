@@ -40,7 +40,7 @@ struct State {
     VTCompressionSessionRef encoder = nullptr;
     std::mutex socketMutex;
     int client = -1;
-    std::uint32_t frameId = 0;
+    std::atomic<std::uint32_t> frameId{0};
 };
 
 State g;
@@ -378,18 +378,21 @@ bool startEncoder() {
     return true;
 }
 
-void startCapture() {
+bool startCapture() {
     os_log(gLog, "Starting CGDisplayStream");
     const CGDirectDisplayID display = CGMainDisplayID();
     const double minimumFrameTime = 1.0 / kFps;
     CFNumberRef frameTime = CFNumberCreate(kCFAllocatorDefault, kCFNumberDoubleType,
                                            &minimumFrameTime);
-    const void* keys[] = {kCGDisplayStreamMinimumFrameTime};
-    const void* values[] = {frameTime};
-    CFDictionaryRef properties = CFDictionaryCreate(
-        kCFAllocatorDefault, keys, values, 1,
-        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    if (frameTime) CFRelease(frameTime);
+    CFDictionaryRef properties = nullptr;
+    if (frameTime) {
+        const void* keys[] = {kCGDisplayStreamMinimumFrameTime};
+        const void* values[] = {frameTime};
+        properties = CFDictionaryCreate(
+            kCFAllocatorDefault, keys, values, 1,
+            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        CFRelease(frameTime);
+    }
 
     g.stream = CGDisplayStreamCreateWithDispatchQueue(
         display, kWidth, kHeight, kCVPixelFormatType_32BGRA, properties,
@@ -448,10 +451,17 @@ void startCapture() {
     if (properties) CFRelease(properties);
     if (!g.stream) {
         os_log_error(gLog, "CGDisplayStreamCreateWithDispatchQueue returned null");
-        return;
+        return false;
     }
     const CGError startStatus = CGDisplayStreamStart(g.stream);
     os_log(gLog, "CGDisplayStreamStart returned: %{public}d", (int)startStatus);
+    if (startStatus != kCGErrorSuccess) {
+        os_log_error(gLog, "CGDisplayStreamStart failed; capture cannot be reported as active");
+        CFRelease(g.stream);
+        g.stream = nullptr;
+        return false;
+    }
+    return true;
 }
 
 } // namespace
@@ -474,23 +484,26 @@ extern "C" void SecondScreenStartTestStream(void) {
         return;
     }
 
+    g.frameId.store(0);
     g.discoveryThread = std::thread(discoveryLoop);
     g.serverThread = std::thread(serverLoop);
     SecondScreenStartUsbAccessory();
-    startCapture();
 
-    if (!g.stream) {
-        os_log_error(gLog, "Test stream aborted: display capture could not be created");
+    if (!startCapture()) {
+        os_log_error(gLog, "Test stream aborted: display capture failed to start");
         g.running = false;
         if (g.discoveryThread.joinable()) g.discoveryThread.join();
+        if (g.serverThread.joinable()) g.serverThread.join();
+        SecondScreenStopUsbAccessory();
         if (g.encoder) {
             VTCompressionSessionInvalidate(g.encoder);
             CFRelease(g.encoder);
             g.encoder = nullptr;
         }
-    } else {
-        os_log(gLog, "SecondScreen test stream is running");
+        return;
     }
+
+    os_log(gLog, "SecondScreen test stream is running");
 }
 
 extern "C" void SecondScreenStopTestStream(void) {
