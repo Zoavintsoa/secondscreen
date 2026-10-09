@@ -15,6 +15,16 @@ include_directories(
 # Enable testing
 enable_testing()
 
+# Release builds define NDEBUG by default, which would silently disable the
+# assert-based test suites. Undefine it for every test executable in all configs.
+function(secondscreen_enable_test_assertions target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(${target} PRIVATE -UNDEBUG)
+    endif()
+endfunction()
+
 if(WIN32)
     add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN _UNICODE UNICODE)
 
@@ -60,30 +70,35 @@ add_executable(test_protocol
 )
 target_include_directories(test_protocol PRIVATE core/protocol)
 add_test(NAME ProtocolTest COMMAND test_protocol)
+secondscreen_enable_test_assertions(test_protocol)
 
 add_executable(test_framing
     tests/test_framing.cpp
 )
 target_include_directories(test_framing PRIVATE core/protocol)
 add_test(NAME FramingTest COMMAND test_framing)
+secondscreen_enable_test_assertions(test_framing)
 
 add_executable(test_pipeline
     tests/test_pipeline.cpp
 )
 target_include_directories(test_pipeline PRIVATE core/protocol native/windows)
 add_test(NAME PipelineTest COMMAND test_pipeline)
+secondscreen_enable_test_assertions(test_pipeline)
 
 add_executable(test_h264_bitstream
     tests/test_h264_bitstream.cpp
 )
 target_include_directories(test_h264_bitstream PRIVATE core/protocol)
 add_test(NAME BitstreamTest COMMAND test_h264_bitstream)
+secondscreen_enable_test_assertions(test_h264_bitstream)
 
 add_executable(test_session_security_perf
     tests/test_session_security_perf.cpp
 )
 target_include_directories(test_session_security_perf PRIVATE core/protocol)
 add_test(NAME SessionSecurityPerfTest COMMAND test_session_security_perf)
+secondscreen_enable_test_assertions(test_session_security_perf)
 
 # The shared protocol is the intended cross-platform control path. Compile its
 # production sources in CI instead of testing only the legacy core/protocol tree.
@@ -94,3 +109,4 @@ add_executable(test_shared_control_protocol
 )
 target_include_directories(test_shared_control_protocol PRIVATE native/shared-protocol)
 add_test(NAME SharedControlProtocolTest COMMAND test_shared_control_protocol)
+secondscreen_enable_test_assertions(test_shared_control_protocol)
