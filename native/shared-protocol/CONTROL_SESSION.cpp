@@ -105,7 +105,7 @@ bool findValue(std::string_view json, std::string_view key, size_t& valueStart) 
         size_t before = keyPos;
         while (before > 0 && std::isspace(static_cast<unsigned char>(json[before - 1]))) --before;
         if (before == 0 || (json[before - 1] != '{' && json[before - 1] != ',')) {
-            pos = keyPos + 1;
+            pos = keyPos;
             std::string ignored;
             if (!parseJsonString(json, pos, ignored)) return false;
             continue;
