@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <net/if.h>
 #include <ifaddrs.h>
 #include <sys/socket.h>
@@ -306,6 +307,14 @@ void serverLoop() {
             continue;
         }
         os_log(gLog, "Android video client connected");
+
+        int noDelay = 1;
+        setsockopt(client, IPPROTO_TCP, TCP_NODELAY, &noDelay, sizeof(noDelay));
+        // Bound write stalls so a client that stops reading cannot freeze the
+        // VideoToolbox callback or make the host's Stop action wait indefinitely.
+        timeval sendTimeout{};
+        sendTimeout.tv_sec = 1;
+        setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &sendTimeout, sizeof(sendTimeout));
 
         {
             std::lock_guard<std::mutex> lock(g.socketMutex);
