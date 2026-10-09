@@ -110,7 +110,7 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
     @objc private func stopExperimentalVirtualDisplay() {
         virtualDisplayManager.destroyVirtualDisplay()
         virtualDisplayStatusLabel?.stringValue =
-            "Demande de suppression envoyée. macOS peut mettre un court instant à actualiser la disposition des moniteurs."
+            "Demande de suppression envoyée. Si le moniteur reste visible, quittez SecondScreen : la suppression par API privée n’est pas garantie avant la fin du processus."
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
