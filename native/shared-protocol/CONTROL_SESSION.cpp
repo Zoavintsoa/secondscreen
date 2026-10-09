@@ -95,32 +95,34 @@ bool parseJsonString(std::string_view json, size_t& pos, std::string& out) {
 
 bool findValue(std::string_view json, std::string_view key, size_t& valueStart) {
     size_t pos = 0;
+    int depth = 0;
     while (pos < json.size()) {
-        const size_t keyPos = json.find('"', pos);
-        if (keyPos == std::string_view::npos) return false;
+        const char c = json[pos];
+        if (c == '"') {
+            const size_t stringStart = pos;
+            std::string parsed;
+            if (!parseJsonString(json, pos, parsed)) return false;
+            size_t after = pos;
+            while (after < json.size() && std::isspace(static_cast<unsigned char>(json[after]))) ++after;
 
-        // A property key must begin at an object/array delimiter context, not
-        // inside another JSON string. This prevents key-like text in device names
-        // from being mistaken for an actual property.
-        size_t before = keyPos;
-        while (before > 0 && std::isspace(static_cast<unsigned char>(json[before - 1]))) --before;
-        if (before == 0 || (json[before - 1] != '{' && json[before - 1] != ',')) {
-            pos = keyPos;
-            std::string ignored;
-            if (!parseJsonString(json, pos, ignored)) return false;
+            // Session fields are defined at the root object only. Ignore
+            // same-named properties inside nested objects or string values.
+            if (depth == 1 && after < json.size() && json[after] == ':' && parsed == key) {
+                valueStart = after + 1;
+                while (valueStart < json.size() &&
+                       std::isspace(static_cast<unsigned char>(json[valueStart]))) ++valueStart;
+                return valueStart < json.size();
+            }
+            (void)stringStart;
             continue;
         }
-
-        size_t after = keyPos;
-        std::string parsedKey;
-        if (!parseJsonString(json, after, parsedKey)) return false;
-        while (after < json.size() && std::isspace(static_cast<unsigned char>(json[after]))) ++after;
-        if (after < json.size() && json[after] == ':' && parsedKey == key) {
-            valueStart = after + 1;
-            while (valueStart < json.size() && std::isspace(static_cast<unsigned char>(json[valueStart]))) ++valueStart;
-            return valueStart < json.size();
+        if (c == '{' || c == '[') {
+            ++depth;
+        } else if (c == '}' || c == ']') {
+            --depth;
+            if (depth < 0) return false;
         }
-        pos = after;
+        ++pos;
     }
     return false;
 }
