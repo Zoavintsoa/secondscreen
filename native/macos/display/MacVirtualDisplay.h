@@ -4,6 +4,7 @@
 // Copyright (c) 2026 Zoavintsoa. All rights reserved.
 
 #import <Foundation/Foundation.h>
+#include <stdint.h>
 #import <CoreGraphics/CoreGraphics.h>
 
 NS_ASSUME_NONNULL_BEGIN
