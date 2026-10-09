@@ -11,7 +11,9 @@
 
 ## Limitations
 
-This uses undocumented Apple implementation details and may stop working after a macOS update. It is a local development experiment, not suitable for claiming production support or Mac App Store readiness. The create button alone does not prove success: the monitor must appear in **System Settings → Displays**, accept a normal application window, and disappear after removal or app exit.
+This uses undocumented Apple implementation details and may stop working after a macOS update. It is a local development experiment, not suitable for claiming production support or Mac App Store readiness. The create button alone does not prove success: the monitor must appear in **System Settings → Displays** and accept a normal application window.
+
+Releasing the private display object may not immediately remove the monitor from the OS display topology on every macOS build. The **Remove monitor** button is best-effort only; if the monitor remains, quit the application and verify that macOS removes it. Do not rely on repeated create/remove cycles in one process until the target Mac has confirmed that lifecycle.
 
 ## Hardware validation
 
@@ -19,8 +21,9 @@ This uses undocumented Apple implementation details and may stop working after a
 2. Select **Créer le moniteur virtuel**.
 3. Record any error message and Console logs if it fails.
 4. If creation reports success, verify a distinct display in **Réglages Système → Moniteurs** and move a normal window onto it.
-5. Select **Supprimer le moniteur** and verify that the extra display disappears. Repeat after quitting the app.
-6. Record the macOS build, display ID, resolution, and refresh rate.
+5. Select **Supprimer le moniteur** and check whether the display disappears. If not, quit SecondScreen and verify again.
+6. Restart the app before attempting another create/remove cycle.
+7. Record the macOS build, display ID, resolution, and refresh rate.
 
 ## Next stage
 
