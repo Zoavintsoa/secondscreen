@@ -6,6 +6,18 @@ on:
   pull_request:
 
 jobs:
+  unit-tests:
+    name: Cross-platform C++ unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Configure CMake
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build unit-test targets
+        run: cmake --build build --parallel 2
+      - name: Run unit tests
+        run: ctest --test-dir build --output-on-failure
+
   windows-host:
     runs-on: windows-latest
     steps:
