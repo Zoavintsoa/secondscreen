@@ -49,6 +49,16 @@ static void testMalformedFramesAreRejected() {
     assert(sizeParser.push(tooLarge.data(), tooLarge.size(), message) == ParseStatus::Invalid);
 }
 
+static void testPropertyNamesInsideStringsCannotSpoofIdentity() {
+    ControlSession session;
+    const auto spoofed = session.onMessage({
+        MessageType::Hello, 1, 0,
+        R"({"deviceName":"text with \"deviceId\":\"attacker\""})"
+    });
+    assert(spoofed.close && !spoofed.accepted);
+    assert(session.state() == SessionState::Disconnected);
+}
+
 static void testPairingAndAuthenticationGates() {
     const std::string token(64, 'b');
     ControlSession::SecurityCallbacks security{
@@ -94,6 +104,7 @@ static void testPairingAndAuthenticationGates() {
 int main() {
     testFragmentedAndCoalescedFrames();
     testMalformedFramesAreRejected();
+    testPropertyNamesInsideStringsCannotSpoofIdentity();
     testPairingAndAuthenticationGates();
     std::cout << "Shared control protocol tests passed.\n";
     return 0;
