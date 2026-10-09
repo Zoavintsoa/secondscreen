@@ -190,7 +190,7 @@ void encoderCallback(void* refcon,
 void discoveryLoop() {
     const char payload[] =
         "{\"service\":\"secondscreen\",\"name\":\"SecondScreen iMac\","
-        "\"mode\":\"test\",\"controlPort\":49152,\"videoPort\":49153,"
+        "\"mode\":\"test\",\"controlPort\":0,\"videoPort\":49153,"
         "\"width\":1280,\"height\":720,\"fps\":30}";
 
     while (g.running.load()) {
