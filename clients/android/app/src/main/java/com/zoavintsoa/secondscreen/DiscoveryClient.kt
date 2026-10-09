@@ -43,17 +43,26 @@ class DiscoveryClient {
                     if (json.optString("service") != "secondscreen") continue
 
                     val address = packet.address.hostAddress ?: continue
+                    val mode = json.optString("mode", "production")
                     val controlPort = json.optInt("controlPort", 49152)
                     val videoPort = json.optInt("videoPort", 49153)
 
-                    if (controlPort !in 1..65535 || videoPort !in 1..65535) continue
+                    // The macOS test-stream host intentionally has no control server.
+                    // Port 0 makes that capability explicit; production hosts must
+                    // still advertise a valid control endpoint for authenticated pairing.
+                    val controlPortValid = if (mode == "test") {
+                        controlPort in 0..65535
+                    } else {
+                        controlPort in 1..65535
+                    }
+                    if (!controlPortValid || videoPort !in 1..65535) continue
 
                     return HostAdvertisement(
                         address = address,
                         name = json.optString("name", "SecondScreen Host"),
                         controlPort = controlPort,
                         videoPort = videoPort,
-                        mode = json.optString("mode", "production"),
+                        mode = mode,
                         width = json.optInt("width", 1920).coerceIn(16, 7680),
                         height = json.optInt("height", 1080).coerceIn(16, 4320),
                         fps = json.optInt("fps", 60).coerceIn(1, 240)
