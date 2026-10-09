@@ -3,8 +3,10 @@
     <style name="Theme.SecondScreen" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowFullscreen">true</item>
-        <item name="android:colorAccent">#FFFFFF</item>
-        <item name="android:navigationBarColor">#000000</item>
+        <item name="android:colorAccent">#20C7F4</item>
         <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:navigationBarColor">#101722</item>
+        <item name="android:statusBarColor">#101722</item>
+        <item name="android:windowActionModeOverlay">true</item>
     </style>
 </resources>
