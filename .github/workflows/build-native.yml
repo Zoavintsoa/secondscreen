@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+# Avoid spending CI minutes on obsolete commits when several small fixes land together.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   unit-tests:
     name: Cross-platform C++ unit tests
