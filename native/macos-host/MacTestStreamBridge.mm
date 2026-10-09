@@ -33,6 +33,7 @@ constexpr int kBitrate = 5 * 1000 * 1000;
 
 struct State {
     std::atomic<bool> running{false};
+    std::atomic<int> status{0};
     std::thread discoveryThread;
     std::thread serverThread;
     CGDisplayStreamRef stream = nullptr;
@@ -260,7 +261,11 @@ void discoveryLoop() {
 
 void serverLoop() {
     const int listener = socket(AF_INET, SOCK_STREAM, 0);
-    if (listener < 0) return;
+    if (listener < 0) {
+        g.status = 7;
+        os_log_error(gLog, "Video TCP socket creation failed: %{public}d", errno);
+        return;
+    }
 
     int yes = 1;
     setsockopt(listener, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(yes));
@@ -275,13 +280,16 @@ void serverLoop() {
     if (bind(listener, reinterpret_cast<sockaddr*>(&address), sizeof(address)) < 0) {
         os_log_error(gLog, "Video TCP bind failed: %{public}d", errno);
         close(listener);
+        g.status = 7;
         return;
     }
     if (listen(listener, 1) < 0) {
         os_log_error(gLog, "Video TCP listen failed: %{public}d", errno);
         close(listener);
+        g.status = 7;
         return;
     }
+    g.status = 2;
     os_log(gLog, "Video TCP server listening on %{public}d", kVideoPort);
 
     while (g.running.load()) {
@@ -303,6 +311,7 @@ void serverLoop() {
             std::lock_guard<std::mutex> lock(g.socketMutex);
             if (g.client >= 0) close(g.client);
             g.client = client;
+            g.status = 3;
         }
 
         while (g.running.load()) {
@@ -319,6 +328,7 @@ void serverLoop() {
         } else {
             close(client);
         }
+        if (g.running.load()) g.status = 2;
     }
 
     close(listener);
@@ -429,8 +439,13 @@ void startCapture() {
 
 } // namespace
 
+extern "C" int SecondScreenGetTestStreamStatus(void) {
+    return g.status.load();
+}
+
 extern "C" void SecondScreenStartTestStream(void) {
     if (g.running.exchange(true)) return;
+    g.status = 1;
 
     os_log(gLog, "SecondScreenStartTestStream");
 
@@ -439,11 +454,13 @@ extern "C" void SecondScreenStartTestStream(void) {
         const bool requested = CGRequestScreenCaptureAccess();
         os_log(gLog, "CGRequestScreenCaptureAccess returned: %{public}s", requested ? "true" : "false");
         g.running = false;
+        g.status = 4;
         return;
     }
 
     if (!startEncoder()) {
         g.running = false;
+        g.status = 5;
         return;
     }
 
@@ -457,6 +474,7 @@ extern "C" void SecondScreenStartTestStream(void) {
         // Use the same complete cleanup path as a normal stop. In particular,
         // also join the server thread and stop the USB worker after partial startup.
         SecondScreenStopTestStream();
+        g.status = 6;
     } else {
         os_log(gLog, "SecondScreen test stream is running");
     }
@@ -493,4 +511,5 @@ extern "C" void SecondScreenStopTestStream(void) {
     SecondScreenStopUsbAccessory();
     if (g.discoveryThread.joinable()) g.discoveryThread.join();
     if (g.serverThread.joinable()) g.serverThread.join();
+    g.status = 0;
 }
