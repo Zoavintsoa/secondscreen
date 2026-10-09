@@ -73,6 +73,10 @@ Legal and product documents:
 - ABOUT.md
 - THIRD_PARTY_NOTICES.md
 
+## Visual identity and interface
+
+The first native visual foundation uses a deep blue-black surface, cyan accent, native system typography and a paired-display icon concept. The macOS control dashboard and Android launcher are initial implementations; visual polish and platform-specific layouts will evolve without representing unfinished display modes as available. See [`docs/BRAND_GUIDE.md`](docs/BRAND_GUIDE.md).
+
 ## Engineering rules
 
 1. Native functionality takes priority over UI mockups.
