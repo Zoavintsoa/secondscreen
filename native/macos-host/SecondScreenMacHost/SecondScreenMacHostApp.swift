@@ -89,7 +89,7 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         page.addArrangedSubview(makeFooter())
 
         for item in page.arrangedSubviews {
-            item.widthAnchor.constraint(equalTo: page.widthAnchor).isActive = true
+            item.widthAnchor.constraint(equalTo: page.widthAnchor, constant: -60).isActive = true
         }
 
         self.window = window
