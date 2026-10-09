@@ -84,3 +84,13 @@ add_executable(test_session_security_perf
 )
 target_include_directories(test_session_security_perf PRIVATE core/protocol)
 add_test(NAME SessionSecurityPerfTest COMMAND test_session_security_perf)
+
+# The shared protocol is the intended cross-platform control path. Compile its
+# production sources in CI instead of testing only the legacy core/protocol tree.
+add_executable(test_shared_control_protocol
+    tests/test_shared_control_protocol.cpp
+    native/shared-protocol/CONTROL_PROTOCOL.cpp
+    native/shared-protocol/CONTROL_SESSION.cpp
+)
+target_include_directories(test_shared_control_protocol PRIVATE native/shared-protocol)
+add_test(NAME SharedControlProtocolTest COMMAND test_shared_control_protocol)
