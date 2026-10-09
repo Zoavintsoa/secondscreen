@@ -29,7 +29,9 @@ The current VideoToolbox implementation is a capability/architecture scaffold on
 
 The public macOS APIs currently used by this project do not provide a supported way for an ordinary application to create an OS-level virtual monitor. The branch `feat/macos-experimental-virtual-display` contains an isolated **experimental** prototype using undocumented CoreGraphics runtime classes.
 
-That prototype is for local engineering validation only. It may fail or break across macOS releases, is not a production compatibility guarantee, and is not ready for Mac App Store distribution. A button response is not sufficient validation: the monitor must appear in System Settings → Displays, accept a normal application window, and disappear cleanly after teardown.
+That prototype is for local engineering validation only. It may fail or break across macOS releases, is not a production compatibility guarantee, and is not ready for Mac App Store distribution. A button response is not sufficient validation: the monitor must appear in System Settings → Displays and accept a normal application window.
+
+Removing the private display object is best-effort; some macOS builds may keep the monitor until the process exits. If it remains after selecting Remove monitor, quit SecondScreen and verify cleanup.
 
 The existing test stream still captures the primary display. The prototype does **not** yet route frames from the virtual display to Android/iPadOS.
 
