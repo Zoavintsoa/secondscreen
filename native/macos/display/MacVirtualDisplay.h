@@ -9,6 +9,9 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef void (^SecondScreenVirtualDisplayCompletion)(BOOL success,
+                                                     NSString * _Nullable errorMessage);
+
 @interface SecondScreenMacVirtualDisplayManager : NSObject
 
 @property(nonatomic, readonly) CGDirectDisplayID displayID;
@@ -17,10 +20,13 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, readonly) uint32_t height;
 @property(nonatomic, copy, readonly) NSString *lastError;
 
-- (BOOL)createVirtualDisplayWithWidth:(uint32_t)width
+// Completion is called on the main queue. Display creation starts on the main queue,
+// but online confirmation is polled asynchronously to avoid blocking the UI.
+- (void)createVirtualDisplayWithWidth:(uint32_t)width
                                height:(uint32_t)height
                           refreshRate:(double)refreshRate
-                                 name:(NSString *)name;
+                                 name:(NSString *)name
+                           completion:(SecondScreenVirtualDisplayCompletion)completion;
 - (void)destroyVirtualDisplay;
 
 @end

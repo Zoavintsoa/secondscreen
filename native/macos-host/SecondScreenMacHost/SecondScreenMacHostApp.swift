@@ -91,19 +91,25 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func createExperimentalVirtualDisplay() {
-        let created = virtualDisplayManager.createVirtualDisplay(
+        virtualDisplayStatusLabel?.stringValue =
+            "Création du moniteur virtuel… attente de confirmation macOS."
+
+        virtualDisplayManager.createVirtualDisplay(
             withWidth: 1920,
             height: 1080,
             refreshRate: 60,
             name: "SecondScreen — Zoavintsoa"
-        )
+        ) { [weak self] created, errorMessage in
+            guard let self else { return }
 
-        if created {
-            virtualDisplayStatusLabel?.stringValue =
-                "Moniteur créé : ID \(virtualDisplayManager.displayID), \(virtualDisplayManager.width)×\(virtualDisplayManager.height). Vérifiez Réglages Système → Moniteurs. Le flux Android utilise encore l’écran principal."
-        } else {
-            virtualDisplayStatusLabel?.stringValue =
-                "Échec : \(virtualDisplayManager.lastError) Cette fonction expérimentale utilise une API privée de macOS."
+            if created {
+                self.virtualDisplayStatusLabel?.stringValue =
+                    "Moniteur confirmé en ligne : ID \(self.virtualDisplayManager.displayID), \(self.virtualDisplayManager.width)×\(self.virtualDisplayManager.height). Vérifiez Réglages Système → Moniteurs. Le flux Android utilise encore l’écran principal."
+            } else {
+                let reason = errorMessage ?? self.virtualDisplayManager.lastError
+                self.virtualDisplayStatusLabel?.stringValue =
+                    "Échec : \(reason) Cette fonction expérimentale utilise une API privée de macOS."
+            }
         }
     }
 
