@@ -90,6 +90,7 @@ class SecondScreenClient(
             tcpNoDelay = true
             keepAlive = true
             connect(InetSocketAddress(host.address, host.controlPort), 1500)
+            soTimeout = 5000
         }
         controlSocket = cs
         return ControlClient(cs).also { controlClient = it }
