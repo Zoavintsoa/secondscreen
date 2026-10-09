@@ -8,6 +8,7 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
     private let statusDot = NSView()
     private let startButton = NSButton(title: "Démarrer le flux", target: nil, action: nil)
     private let stopButton = NSButton(title: "Arrêter le flux", target: nil, action: nil)
+    private let virtualDisplayButton = NSButton(title: "Créer un écran virtuel", target: nil, action: nil)
 
     static func main() {
         let application = NSApplication.shared
@@ -22,10 +23,10 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
 
-        // Start the existing native test bridge without blocking the UI.
-        DispatchQueue.global(qos: .userInitiated).async {
-            SecondScreenStartTestStream()
-        }
+        streamStatus.stringValue = "Prêt · flux arrêté"
+        statusDot.layer?.backgroundColor = NSColor.systemGray.cgColor
+        startButton.isEnabled = true
+        stopButton.isEnabled = false
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -80,6 +81,8 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
 
         page.addArrangedSubview(makeHeader())
         page.addArrangedSubview(makeHeroCard())
+        page.addArrangedSubview(makeSectionTitle("ÉCRAN VIRTUEL", subtitle: "Gestion du moniteur système"))
+        page.addArrangedSubview(makeVirtualDisplayCard())
         page.addArrangedSubview(makeSectionTitle("CONFIGURATION", subtitle: "Paramètres du flux de test actuel"))
         page.addArrangedSubview(makeConfigurationCard())
         page.addArrangedSubview(makeSectionTitle("CONNEXION & DIAGNOSTIC", subtitle: "Comprendre précisément ce qui fonctionne"))
@@ -102,8 +105,7 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         row.spacing = 14
 
         let icon = NSImageView()
-        icon.image = NSImage(systemSymbolName: "display.2", accessibilityDescription: "SecondScreen")
-        icon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 30, weight: .medium)
+        configureSymbol(icon, name: "display.2", size: 30)
         icon.contentTintColor = NSColor.controlAccentColor
         icon.imageScaling = .scaleProportionallyUpOrDown
         icon.setContentHuggingPriority(.required, for: .horizontal)
@@ -159,15 +161,15 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         startButton.target = self
         startButton.action = #selector(startStream)
         startButton.bezelStyle = .rounded
-        startButton.controlSize = .large
-        startButton.image = NSImage(systemSymbolName: "play.fill", accessibilityDescription: nil)
+        startButton.controlSize = .regular
+        startButton.image = symbolImage("play.fill", accessibilityDescription: "Démarrer")
         startButton.imagePosition = .imageLeading
 
         stopButton.target = self
         stopButton.action = #selector(stopStream)
         stopButton.bezelStyle = .rounded
-        stopButton.controlSize = .large
-        stopButton.image = NSImage(systemSymbolName: "stop.fill", accessibilityDescription: nil)
+        stopButton.controlSize = .regular
+        stopButton.image = symbolImage("stop.fill", accessibilityDescription: "Arrêter")
         stopButton.imagePosition = .imageLeading
 
         actions.addArrangedSubview(startButton)
@@ -177,6 +179,26 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         stack.addArrangedSubview(divider)
         stack.addArrangedSubview(actions)
         embed(stack, in: card, inset: 20)
+        return card
+    }
+
+    private func makeVirtualDisplayCard() -> NSView {
+        let card = cardView()
+        let stack = verticalStack(spacing: 12)
+        stack.addArrangedSubview(label("Créer et gérer un écran supplémentaire", size: 15, weight: .semibold))
+        let detail = label(
+            "L’option est conservée ici. Cette version ne dispose pas encore d’un mécanisme macOS public et validé permettant de créer automatiquement un moniteur virtuel. Aucun écran ne sera déclaré créé sans confirmation du système.",
+            size: 12,
+            color: .secondaryLabelColor
+        )
+        detail.maximumNumberOfLines = 4
+        stack.addArrangedSubview(detail)
+        virtualDisplayButton.target = self
+        virtualDisplayButton.action = #selector(createVirtualDisplay)
+        virtualDisplayButton.bezelStyle = .rounded
+        virtualDisplayButton.controlSize = .regular
+        stack.addArrangedSubview(virtualDisplayButton)
+        embed(stack, in: card, inset: 18)
         return card
     }
 
@@ -251,7 +273,7 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         let button = NSButton(title: "Ouvrir Confidentialité et sécurité", target: self, action: #selector(openScreenRecordingSettings))
         button.bezelStyle = .rounded
         button.controlSize = .regular
-        button.image = NSImage(systemSymbolName: "lock.shield", accessibilityDescription: nil)
+        button.image = symbolImage("lock.shield", accessibilityDescription: "Confidentialité")
         button.imagePosition = .imageLeading
         stack.addArrangedSubview(text)
         stack.addArrangedSubview(button)
@@ -286,8 +308,7 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
     private func diagnosticRow(icon: String, title: String, detail: String, status: String, color: NSColor) -> NSView {
         let row = horizontalStack(spacing: 12)
         let symbol = NSImageView()
-        symbol.image = NSImage(systemSymbolName: icon, accessibilityDescription: nil)
-        symbol.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 17, weight: .medium)
+        configureSymbol(symbol, name: icon, size: 17)
         symbol.contentTintColor = .secondaryLabelColor
         symbol.widthAnchor.constraint(equalToConstant: 24).isActive = true
         symbol.heightAnchor.constraint(equalToConstant: 24).isActive = true
@@ -320,6 +341,22 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         view.layer?.borderWidth = 1
         view.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.45).cgColor
         return view
+    }
+
+    private func symbolImage(_ name: String, accessibilityDescription: String?) -> NSImage? {
+        if #available(macOS 11.0, *) {
+            return NSImage(systemSymbolName: name, accessibilityDescription: accessibilityDescription)
+        }
+        return NSImage(named: NSImage.applicationIconName)
+    }
+
+    private func configureSymbol(_ imageView: NSImageView, name: String, size: CGFloat) {
+        if #available(macOS 11.0, *) {
+            imageView.image = NSImage(systemSymbolName: name, accessibilityDescription: name)
+            imageView.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: size, weight: .medium)
+        } else {
+            imageView.image = NSImage(named: NSImage.applicationIconName)
+        }
     }
 
     private func label(_ text: String, size: CGFloat, weight: NSFont.Weight = .regular, color: NSColor = .labelColor) -> NSTextField {
@@ -368,11 +405,17 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func startStream() {
+        startButton.isEnabled = false
+        stopButton.isEnabled = true
         streamStatus.stringValue = "Démarrage demandé · vidéo non confirmée"
         streamStatus.textColor = .secondaryLabelColor
         statusDot.layer?.backgroundColor = NSColor.systemOrange.cgColor
         DispatchQueue.global(qos: .userInitiated).async {
             SecondScreenStartTestStream()
+            DispatchQueue.main.async {
+                self.startButton.isEnabled = true
+                self.streamStatus.stringValue = "Demande traitée · capture/vidéo à confirmer"
+            }
         }
     }
 
@@ -383,7 +426,22 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
                 self.streamStatus.stringValue = "Arrêt demandé"
                 self.streamStatus.textColor = .secondaryLabelColor
                 self.statusDot.layer?.backgroundColor = NSColor.systemGray.cgColor
+                self.startButton.isEnabled = true
+                self.stopButton.isEnabled = false
             }
+        }
+    }
+
+    @objc private func createVirtualDisplay() {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Création d’écran virtuel indisponible"
+        alert.informativeText = "L’option est rétablie, mais cette version ne peut pas créer un moniteur virtuel macOS avec une API publique prise en charge. Les réglages Écrans permettent de gérer les écrans déjà reconnus par macOS ; ils ne créent pas un écran virtuel SecondScreen."
+        alert.addButton(withTitle: "Ouvrir les réglages Écrans")
+        alert.addButton(withTitle: "Fermer")
+        if alert.runModal() == .alertFirstButtonReturn,
+           let url = URL(string: "x-apple.systempreferences:com.apple.preference.displays") {
+            NSWorkspace.shared.open(url)
         }
     }
 
