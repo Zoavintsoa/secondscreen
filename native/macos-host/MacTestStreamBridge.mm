@@ -397,9 +397,16 @@ void startCapture() {
                                                  &pixelBuffer) != kCVReturnSuccess ||
                 !pixelBuffer) return;
 
-            // CGDisplayStream's displayTime uses the host clock's system units, not
-    // nanoseconds. Convert it with CoreMedia so VideoToolbox receives valid PTS.
-    CMTime pts = CMClockMakeHostTimeFromSystemUnits(displayTime);
+            // CGDisplayStream reports host-clock units. Convert to seconds using
+            // CoreVideo's host-clock frequency, then use a nanosecond CoreMedia timebase.
+            const double hostClockFrequency = CVGetHostClockFrequency();
+            if (hostClockFrequency <= 0.0) {
+                CVPixelBufferRelease(pixelBuffer);
+                return;
+            }
+            const Float64 presentationSeconds =
+                static_cast<Float64>(displayTime) / hostClockFrequency;
+            CMTime pts = CMTimeMakeWithSeconds(presentationSeconds, 1000000000);
             VTEncodeInfoFlags flags = 0;
             VTCompressionSessionEncodeFrame(g.encoder, pixelBuffer, pts,
                                             CMTimeMake(1, kFps), nullptr, nullptr, &flags);
