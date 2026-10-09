@@ -10,7 +10,7 @@ data class StreamConfig(
         fun parse(json:String):StreamConfig {
             fun i(n:String,d:Int)=Regex("\"$n\"\\s*:\\s*(\\d+)").find(json)?.groupValues?.get(1)?.toIntOrNull()?:d
             fun s(n:String,d:String)=Regex("\"$n\"\\s*:\\s*\"([^\"]+)\"").find(json)?.groupValues?.get(1)?:d
-            val codecText=s("codec","h264").lowercase()
+            val codecText=s("codec","").lowercase()
             val codec=if(codecText=="hevc" || codecText=="2")2 else if(codecText=="h264" || codecText=="avc" || codecText=="1")1 else i("codec",1)
             return StreamConfig(
                 i("width",1280),i("height",720),i("fps",30),i("bitrateKbps",4000),
