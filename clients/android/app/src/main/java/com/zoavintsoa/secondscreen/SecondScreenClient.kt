@@ -194,6 +194,12 @@ class SecondScreenClient(
                 preferences.edit()
                     .putString("lastHostAddress", host.address)
                     .putString("lastHostName", host.name)
+                    .putString("lastHostMode", host.mode)
+                    .putInt("lastHostControlPort", host.controlPort)
+                    .putInt("lastHostVideoPort", host.videoPort)
+                    .putInt("lastHostWidth", host.width)
+                    .putInt("lastHostHeight", host.height)
+                    .putInt("lastHostFps", host.fps)
                     .apply()
 
                 onStatus(
@@ -277,12 +283,22 @@ class SecondScreenClient(
         }
 
         if (_connectionMode == ConnectionMode.AUTO && !cachedAddress.isNullOrBlank()) {
+            // Never downgrade a cached production host to unauthenticated test mode.
+            // Keep the last advertised capabilities; if no metadata exists, fail closed
+            // as a production host rather than bypassing control-channel authentication.
+            val cachedMode = preferences.getString("lastHostMode", "production") ?: "production"
+            val defaultWidth = if (cachedMode == "test") 1280 else 1920
+            val defaultHeight = if (cachedMode == "test") 720 else 1080
+            val defaultFps = if (cachedMode == "test") 30 else 60
             val cached = HostAdvertisement(
                 address = cachedAddress,
                 name = cachedName,
-                controlPort = 49152,
-                videoPort = 49153,
-                mode = "test"
+                controlPort = preferences.getInt("lastHostControlPort", 49152),
+                videoPort = preferences.getInt("lastHostVideoPort", 49153),
+                mode = cachedMode,
+                width = preferences.getInt("lastHostWidth", defaultWidth),
+                height = preferences.getInt("lastHostHeight", defaultHeight),
+                fps = preferences.getInt("lastHostFps", defaultFps)
             )
             if (probeVideo(cached)) {
                 discoveredHost = cached
