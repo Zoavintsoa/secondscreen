@@ -57,6 +57,13 @@ static void testPropertyNamesInsideStringsCannotSpoofIdentity() {
     });
     assert(spoofed.close && !spoofed.accepted);
     assert(session.state() == SessionState::Disconnected);
+
+    const auto nestedSpoof = session.onMessage({
+        MessageType::Hello, 1, 0,
+        R"({"metadata":{"deviceId":"attacker"}})"
+    });
+    assert(nestedSpoof.close && !nestedSpoof.accepted);
+    assert(session.state() == SessionState::Disconnected);
 }
 
 static void testPairingAndAuthenticationGates() {
