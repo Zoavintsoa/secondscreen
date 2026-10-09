@@ -4,7 +4,7 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <application android:theme="@style/Theme.SecondScreen" android:label="SecondScreen — Zoavintsoa"
+    <application android:theme="@style/Theme.SecondScreen" android:label="SecondScreen — Zoavintsoa" android:icon="@drawable/ic_secondscreen"
         android:usesCleartextTraffic="true" android:hardwareAccelerated="true"
         android:allowBackup="false" android:supportsRtl="true">
         <activity android:name=".MainActivity" android:screenOrientation="sensorLandscape" android:exported="true">

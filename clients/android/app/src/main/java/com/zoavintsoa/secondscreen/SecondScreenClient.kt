@@ -1,6 +1,7 @@
 package com.zoavintsoa.secondscreen
 
 import android.content.Context
+import android.util.Log
 import android.view.SurfaceHolder
 import java.io.BufferedInputStream
 import java.io.DataInputStream
@@ -205,6 +206,9 @@ class SecondScreenClient(
             } catch (t: Throwable) {
                 if (!running.get()) break
                 if (t !is InterruptedException) {
+                    // Keep the user-facing status concise while preserving the
+                    // real cause (protocol, socket, or decoder) in Logcat.
+                    Log.e("SecondScreenClient", "Connection/video stream failed; retrying", t)
                     onStatus(
                         if (_connectionMode == ConnectionMode.USB)
                             "SecondScreen — USB indisponible"
@@ -354,7 +358,8 @@ class SecondScreenClient(
 
         runCatching {
             decoder?.decode(codec, width, height, au, timestampUs, keyFrame)
-        }.onFailure {
+        }.onFailure { error ->
+            Log.e("SecondScreenClient", "Video decoder rejected an access unit; waiting for keyframe", error)
             awaitingKeyframe = true
             controlClient?.requestKeyframe()
         }
