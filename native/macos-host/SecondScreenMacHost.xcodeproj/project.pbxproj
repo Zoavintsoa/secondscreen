@@ -60,7 +60,7 @@
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-    B10000000000000000000041 = {isa = PBXProject; attributes = { LastUpgradeCheck = 1600; ORGANIZATIONNAME = Zoavintsoa; TargetAttributes = { B10000000000000000000040 = { CreatedOnToolsVersion = 16.0; }; }; }; buildConfigurationList = B10000000000000000000051; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en,); mainGroup = B10000000000000000000030; projectDirPath = ""; projectRoot = ""; targets = (B10000000000000000000040,); };
+    B10000000000000000000041 = {isa = PBXProject; attributes = { LastUpgradeCheck = 1600; ORGANIZATIONNAME = Zoavintsoa; TargetAttributes = { B10000000000000000000040 = { CreatedOnToolsVersion = 16.0; }; }; }; buildConfigurationList = B10000000000000000000051; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en,); mainGroup = B10000000000000000000030; productRefGroup = B10000000000000000000032; projectDirPath = ""; projectRoot = ""; targets = (B10000000000000000000040,); };
 /* End PBXProject section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -78,6 +78,6 @@
     B10000000000000000000050 = {isa = XCConfigurationList; buildConfigurations = (B10000000000000000000070, B10000000000000000000071,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
     B10000000000000000000051 = {isa = XCConfigurationList; buildConfigurations = (B10000000000000000000072, B10000000000000000000073,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
 /* End XCConfigurationList section */
- }
+ };
  rootObject = B10000000000000000000041;
 }
