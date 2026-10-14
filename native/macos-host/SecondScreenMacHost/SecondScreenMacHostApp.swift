@@ -412,7 +412,7 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         statusDot.layer?.backgroundColor = NSColor.systemOrange.cgColor
         DispatchQueue.global(qos: .userInitiated).async {
             SecondScreenStartTestStream()
-            let running = SecondScreenIsTestStreamRunning()
+            let running = SecondScreenIsTestStreamRunning() != 0
             DispatchQueue.main.async {
                 self.startButton.isEnabled = !running
                 self.stopButton.isEnabled = running
