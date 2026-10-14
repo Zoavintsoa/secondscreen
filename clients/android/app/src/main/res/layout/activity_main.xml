@@ -51,7 +51,7 @@
             android:id="@+id/aboutButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="À propos"
+            android:text="Réglages"
             android:minWidth="48dp"
             android:minHeight="48dp" />
     </LinearLayout>

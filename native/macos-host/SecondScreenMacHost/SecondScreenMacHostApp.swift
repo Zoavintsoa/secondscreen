@@ -4,6 +4,9 @@ import Dispatch
 @main
 final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
     private var window: NSWindow?
+    private let virtualDisplayManager = SecondScreenMacVirtualDisplayManager()
+    private var virtualDisplayStatusLabel: NSTextField?
+    private let removeVirtualDisplayButton = NSButton(title: "Supprimer l’écran virtuel", target: nil, action: nil)
     private let streamStatus = NSTextField(labelWithString: "Initialisation du flux de test…")
     private let statusDot = NSView()
     private let startButton = NSButton(title: "Démarrer le flux", target: nil, action: nil)
@@ -30,6 +33,7 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        virtualDisplayManager.destroyVirtualDisplay()
         SecondScreenStopTestStream()
     }
 
@@ -187,17 +191,28 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         let stack = verticalStack(spacing: 12)
         stack.addArrangedSubview(label("Créer et gérer un écran supplémentaire", size: 15, weight: .semibold))
         let detail = label(
-            "L’option est conservée ici. Cette version ne dispose pas encore d’un mécanisme macOS public et validé permettant de créer automatiquement un moniteur virtuel. Aucun écran ne sera déclaré créé sans confirmation du système.",
+            "Création expérimentale restaurée à partir de l’ancienne implémentation. Elle utilise des API privées de macOS : le système peut la refuser ou la désactiver après une mise à jour. Le flux Android continue de capturer l’écran principal tant que la capture du moniteur virtuel n’est pas intégrée.",
             size: 12,
             color: .secondaryLabelColor
         )
-        detail.maximumNumberOfLines = 4
+        detail.maximumNumberOfLines = 5
         stack.addArrangedSubview(detail)
         virtualDisplayButton.target = self
         virtualDisplayButton.action = #selector(createVirtualDisplay)
         virtualDisplayButton.bezelStyle = .rounded
         virtualDisplayButton.controlSize = .regular
-        stack.addArrangedSubview(virtualDisplayButton)
+        removeVirtualDisplayButton.target = self
+        removeVirtualDisplayButton.action = #selector(removeVirtualDisplay)
+        removeVirtualDisplayButton.bezelStyle = .rounded
+        removeVirtualDisplayButton.controlSize = .regular
+        let actions = horizontalStack(spacing: 10)
+        actions.addArrangedSubview(virtualDisplayButton)
+        actions.addArrangedSubview(removeVirtualDisplayButton)
+        stack.addArrangedSubview(actions)
+        let status = label("État : aucun moniteur virtuel confirmé.", size: 11, color: .secondaryLabelColor)
+        status.maximumNumberOfLines = 3
+        virtualDisplayStatusLabel = status
+        stack.addArrangedSubview(status)
         embed(stack, in: card, inset: 18)
         return card
     }
@@ -412,9 +427,19 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         statusDot.layer?.backgroundColor = NSColor.systemOrange.cgColor
         DispatchQueue.global(qos: .userInitiated).async {
             SecondScreenStartTestStream()
+            let running = SecondScreenIsTestStreamRunning() != 0
             DispatchQueue.main.async {
-                self.startButton.isEnabled = true
-                self.streamStatus.stringValue = "Demande traitée · capture/vidéo à confirmer"
+                self.startButton.isEnabled = !running
+                self.stopButton.isEnabled = running
+                if running {
+                    self.streamStatus.stringValue = "Capture démarrée · réception vidéo à confirmer"
+                    self.streamStatus.textColor = .secondaryLabelColor
+                    self.statusDot.layer?.backgroundColor = NSColor.systemOrange.cgColor
+                } else {
+                    self.streamStatus.stringValue = "Échec du démarrage · vérifier les autorisations et Console"
+                    self.streamStatus.textColor = NSColor.systemRed
+                    self.statusDot.layer?.backgroundColor = NSColor.systemRed.cgColor
+                }
             }
         }
     }
@@ -433,16 +458,29 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func createVirtualDisplay() {
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = "Création d’écran virtuel indisponible"
-        alert.informativeText = "L’option est rétablie, mais cette version ne peut pas créer un moniteur virtuel macOS avec une API publique prise en charge. Les réglages Écrans permettent de gérer les écrans déjà reconnus par macOS ; ils ne créent pas un écran virtuel SecondScreen."
-        alert.addButton(withTitle: "Ouvrir les réglages Écrans")
-        alert.addButton(withTitle: "Fermer")
-        if alert.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.preference.displays") {
-            NSWorkspace.shared.open(url)
+        virtualDisplayButton.isEnabled = false
+        virtualDisplayStatusLabel?.stringValue = "Création du moniteur virtuel… attente de confirmation macOS."
+        virtualDisplayManager.createVirtualDisplay(
+            withWidth: 1920,
+            height: 1080,
+            refreshRate: 60,
+            name: "SecondScreen — Zoavintsoa"
+        ) { [weak self] success, errorMessage in
+            guard let self else { return }
+            self.virtualDisplayButton.isEnabled = true
+            if success && self.virtualDisplayManager.isDisplayActive {
+                self.virtualDisplayStatusLabel?.stringValue = "Moniteur confirmé en ligne : ID \(self.virtualDisplayManager.displayID), \(self.virtualDisplayManager.width)×\(self.virtualDisplayManager.height). Le flux Android utilise encore l’écran principal."
+            } else {
+                let reason = errorMessage ?? self.virtualDisplayManager.lastError
+                self.virtualDisplayStatusLabel?.stringValue = "Échec : \(reason) Cette fonction expérimentale utilise une API privée de macOS."
+            }
         }
+    }
+
+    @objc private func removeVirtualDisplay() {
+        virtualDisplayManager.destroyVirtualDisplay()
+        virtualDisplayStatusLabel?.stringValue = "Demande de suppression effectuée. Vérifiez Réglages Système → Moniteurs."
+        virtualDisplayButton.isEnabled = true
     }
 
     @objc private func openScreenRecordingSettings() {
