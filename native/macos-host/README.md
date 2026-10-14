@@ -29,9 +29,9 @@ The current VideoToolbox implementation is a capability/architecture scaffold on
 
 ### Virtual display
 
-Capture and virtual-display creation are separate problems. A real virtual monitor is not considered implemented until a public, supportable macOS display-creation mechanism is validated. Sidecar is not used.
+Capture and virtual-display creation are separate problems. A previous experimental virtual-display implementation has been restored behind an explicit warning. It uses undocumented private CoreGraphics runtime classes, is not a supported Apple API, and may stop working across macOS releases. It is not suitable to present as a production-ready or distribution-safe feature. Sidecar is not used.
 
-No private Apple display API will be introduced merely to make the old-Mac path appear complete.
+The test stream still captures the main display; virtual-display frame capture is not yet connected. A supported production implementation remains a separate requirement.
 
 ## Product target
 
