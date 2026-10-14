@@ -160,7 +160,7 @@ class MainActivity : ComponentActivity() {
             append("Port vidéo : ").append(videoPort).append("\n")
             append("Port de contrôle : ").append(controlPort).append("\n")
             append("Flux annoncé : ").append(stream).append("\n")
-            append("Connexion Android : ").append(connectionMode.name)
+            append("Connexion Android : ").append(client?.connectionMode?.name ?: "AUTO")
         }
         val text = TextView(this).apply {
             this.text = message
