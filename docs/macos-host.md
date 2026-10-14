@@ -8,8 +8,9 @@ The current macOS host is an **experimental screen-mirroring test stream**, not 
 - It encodes H.264 with a `VTCompressionSession` and sends framed video over TCP port 49153.
 - Android decodes H.264 with `MediaCodec`.
 - Discovery is broadcast over UDP port 49151.
-- The app's virtual-display action deliberately reports that creation is unavailable.
-- `native/macos/display/MacVirtualDisplay.m` is a stub. It does not create a system display.
+- The macOS UI is reconnected to the earlier **experimental** virtual-display manager in `native/macos/display/MacVirtualDisplay.m`.
+- That manager uses undocumented private CoreGraphics runtime classes and may fail or break on macOS updates; it is not a supported production/distribution path.
+- The UI only reports successful creation after `CGDisplayIsOnline` confirms the candidate display.
 - `native/macos-host/VideoToolboxEncoder.mm` is a capability/architecture scaffold; it is not the active test-stream encoder.
 
 Consequently, a display shown in macOS Settings is not proof that this repository's current virtual-display manager created it. Check which installed build or other software owns that display before relying on it.
@@ -30,7 +31,7 @@ A true extended display requires all of the following:
 4. Explicit display controls: create/stop, resolution/refresh rate, extend/mirror mode where supported, and a visible way to restore the built-in display as primary.
 5. End-to-end tests on the target iMac and Android device.
 
-The repository does not currently implement this complete path. Do not describe the macOS host as a working extended display until these requirements pass on hardware.
+The repository restores experimental virtual-display creation, but does not implement the complete extended-display path: the stream still captures the main display, not the created virtual display. Do not describe the macOS host as a working extended display until a supported display backend and end-to-end hardware tests pass.
 
 ## Safe recovery when windows move to another display
 
