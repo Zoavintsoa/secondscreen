@@ -540,8 +540,8 @@ extern "C" void SecondScreenStartTestStream(void) {
     os_log(gLog, "SecondScreen test stream is running");
 }
 
-extern "C" bool SecondScreenIsTestStreamRunning(void) {
-    return g.running.load(std::memory_order_acquire);
+extern "C" int SecondScreenIsTestStreamRunning(void) {
+    return g.running.load(std::memory_order_acquire) ? 1 : 0;
 }
 
 extern "C" void SecondScreenStopTestStream(void) {
