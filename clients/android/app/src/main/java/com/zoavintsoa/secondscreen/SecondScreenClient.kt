@@ -31,6 +31,7 @@ class SecondScreenClient(
     private var streamConfig = StreamConfig()
     private val reassembler = VideoFragmentReassembler()
     private var awaitingKeyframe = true
+    private var decoderErrorReported = false
     private val usbAccessoryClient = UsbAccessoryClient(context)
 
     private val preferences =
@@ -370,8 +371,15 @@ class SecondScreenClient(
 
         runCatching {
             decoder?.decode(codec, width, height, au, timestampUs, keyFrame)
-        }.onFailure {
+        }.onSuccess {
+            decoderErrorReported = false
+        }.onFailure { error ->
             awaitingKeyframe = true
+            if (!decoderErrorReported) {
+                decoderErrorReported = true
+                onStatus("SecondScreen — erreur de décodage vidéo : " +
+                    (error.message ?: "codec ou image invalide"))
+            }
             controlClient?.requestKeyframe()
         }
     }
