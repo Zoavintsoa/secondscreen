@@ -412,9 +412,19 @@ final class SecondScreenMacHostDelegate: NSObject, NSApplicationDelegate {
         statusDot.layer?.backgroundColor = NSColor.systemOrange.cgColor
         DispatchQueue.global(qos: .userInitiated).async {
             SecondScreenStartTestStream()
+            let running = SecondScreenIsTestStreamRunning() != 0
             DispatchQueue.main.async {
-                self.startButton.isEnabled = true
-                self.streamStatus.stringValue = "Demande traitée · capture/vidéo à confirmer"
+                self.startButton.isEnabled = !running
+                self.stopButton.isEnabled = running
+                if running {
+                    self.streamStatus.stringValue = "Capture démarrée · réception vidéo à confirmer"
+                    self.streamStatus.textColor = .secondaryLabelColor
+                    self.statusDot.layer?.backgroundColor = NSColor.systemOrange.cgColor
+                } else {
+                    self.streamStatus.stringValue = "Échec du démarrage · vérifier les autorisations et Console"
+                    self.streamStatus.textColor = NSColor.systemRed
+                    self.statusDot.layer?.backgroundColor = NSColor.systemRed.cgColor
+                }
             }
         }
     }

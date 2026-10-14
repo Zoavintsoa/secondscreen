@@ -13,6 +13,7 @@ import android.view.WindowManager
 import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import java.util.concurrent.CountDownLatch
@@ -21,6 +22,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private lateinit var connectionModeButton: android.widget.Button
     private var client: SecondScreenClient? = null
+    private var currentStatusText: String = "SecondScreen — recherche d’un hôte…"
+    private val appPreferences by lazy { getSharedPreferences("secondscreen", Context.MODE_PRIVATE) }
 
     private val usbPermissionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -34,7 +37,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        applyKeepScreenAwake(appPreferences.getBoolean("keepScreenAwake", true))
         setContentView(R.layout.activity_main)
         status = findViewById(R.id.status)
         connectionModeButton = findViewById(R.id.connectionModeButton)
@@ -42,7 +45,7 @@ class MainActivity : ComponentActivity() {
         requestUsbPermissionIfNeeded()
 
         findViewById<android.widget.Button>(R.id.aboutButton).setOnClickListener {
-            showAbout()
+            showSettings()
         }
 
         findViewById<android.widget.Button>(R.id.reconnectButton).setOnClickListener {
@@ -88,11 +91,102 @@ class MainActivity : ComponentActivity() {
         client = SecondScreenClient(
             this,
             surface.holder,
-            { message -> runOnUiThread { status.text = message } },
+            { message -> runOnUiThread {
+                currentStatusText = message
+                status.text = message
+            } },
             { hostName -> requestPairingCode(hostName) }
         )
         updateConnectionModeButton()
         surface.holder.addCallback(client)
+    }
+
+    private fun applyKeepScreenAwake(enabled: Boolean) {
+        if (enabled) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
+
+    private fun showSettings() {
+        val keepAwake = appPreferences.getBoolean("keepScreenAwake", true)
+        val items = arrayOf(
+            "Mode de connexion",
+            "Garder l’écran allumé : " + if (keepAwake) "activé" else "désactivé",
+            "Diagnostics de connexion",
+            "Réinitialiser l’appairage…",
+            "À propos de SecondScreen"
+        )
+        AlertDialog.Builder(this)
+            .setTitle("Réglages SecondScreen")
+            .setItems(items) { _, which ->
+                when (which) {
+                    0 -> showConnectionMode()
+                    1 -> {
+                        val enabled = !appPreferences.getBoolean("keepScreenAwake", true)
+                        appPreferences.edit().putBoolean("keepScreenAwake", enabled).apply()
+                        applyKeepScreenAwake(enabled)
+                        Toast.makeText(
+                            this,
+                            if (enabled) "Écran maintenu allumé" else "Mise en veille autorisée",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    2 -> showConnectionDiagnostics()
+                    3 -> confirmResetPairing()
+                    4 -> showAbout()
+                }
+            }
+            .setNegativeButton("Fermer", null)
+            .show()
+    }
+
+    private fun showConnectionDiagnostics() {
+        val host = appPreferences.getString("lastHostName", "Non détecté") ?: "Non détecté"
+        val address = appPreferences.getString("lastHostAddress", "—") ?: "—"
+        val mode = appPreferences.getString("lastHostMode", "—") ?: "—"
+        val videoPort = appPreferences.getInt("lastHostVideoPort", 49153)
+        val controlPort = appPreferences.getInt("lastHostControlPort", 49152)
+        val width = appPreferences.getInt("lastHostWidth", 0)
+        val height = appPreferences.getInt("lastHostHeight", 0)
+        val fps = appPreferences.getInt("lastHostFps", 0)
+        val stream = if (width > 0 && height > 0) "$width × $height à $fps FPS" else "Non annoncé"
+        val message = buildString {
+            append("État : ").append(currentStatusText).append("\n\n")
+            append("Hôte : ").append(host).append("\n")
+            append("Adresse locale : ").append(address).append("\n")
+            append("Mode hôte : ").append(mode).append("\n")
+            append("Port vidéo : ").append(videoPort).append("\n")
+            append("Port de contrôle : ").append(controlPort).append("\n")
+            append("Flux annoncé : ").append(stream).append("\n")
+            append("Connexion Android : ").append(client?.connectionMode?.name ?: "AUTO")
+        }
+        val text = TextView(this).apply {
+            this.text = message
+            textSize = 14f
+            setPadding(32, 24, 32, 24)
+            setTextIsSelectable(true)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("Diagnostics de connexion")
+            .setView(ScrollView(this).apply { addView(text) })
+            .setNeutralButton("Reconnecter") { _, _ -> client?.reconnectNow() }
+            .setPositiveButton("Fermer", null)
+            .show()
+    }
+
+    private fun confirmResetPairing() {
+        AlertDialog.Builder(this)
+            .setTitle("Réinitialiser l’appairage ?")
+            .setMessage("Le jeton local sera supprimé. Vous devrez saisir à nouveau le code affiché sur l’ordinateur à la prochaine connexion.")
+            .setNegativeButton("Annuler", null)
+            .setPositiveButton("Réinitialiser") { _, _ ->
+                appPreferences.edit().remove("sessionToken").apply()
+                client?.reconnectNow()
+                Toast.makeText(this, "Appairage réinitialisé", Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     private fun showConnectionMode() {

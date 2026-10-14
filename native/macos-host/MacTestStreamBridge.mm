@@ -42,6 +42,9 @@ struct State {
     std::mutex socketMutex;
     int client = -1;
     std::atomic<std::uint32_t> frameId{0};
+    // A newly connected decoder must receive an IDR frame immediately; otherwise
+    // it may remain black while waiting for the next periodic keyframe.
+    std::atomic<bool> forceKeyframe{true};
 };
 
 State g;
@@ -320,6 +323,9 @@ void serverLoop() {
             std::lock_guard<std::mutex> lock(g.socketMutex);
             if (g.client >= 0) close(g.client);
             g.client = client;
+            // Force an IDR for every newly accepted client so reconnects do not
+            // depend on waiting for the encoder's periodic keyframe interval.
+            g.forceKeyframe.store(true, std::memory_order_release);
         }
 
         while (g.running.load()) {
@@ -441,9 +447,27 @@ bool startCapture() {
                     : displayTime;
             const CMTime pts = CMTimeMake(static_cast<int64_t>(timestampNs), 1000000000);
             VTEncodeInfoFlags flags = 0;
+            const bool requestedKeyframe =
+                g.forceKeyframe.exchange(false, std::memory_order_acq_rel);
+            CFDictionaryRef frameProperties = nullptr;
+            if (requestedKeyframe) {
+                const void* keys[] = {kVTEncodeFrameOptionKey_ForceKeyFrame};
+                const void* values[] = {kCFBooleanTrue};
+                frameProperties = CFDictionaryCreate(
+                    kCFAllocatorDefault, keys, values, 1,
+                    &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+                if (!frameProperties) {
+                    g.forceKeyframe.store(true, std::memory_order_release);
+                }
+            }
             const OSStatus encodeStatus = VTCompressionSessionEncodeFrame(
-                g.encoder, pixelBuffer, pts, CMTimeMake(1, kFps), nullptr, nullptr, &flags);
+                g.encoder, pixelBuffer, pts, CMTimeMake(1, kFps),
+                frameProperties, nullptr, &flags);
+            if (frameProperties) CFRelease(frameProperties);
             CVPixelBufferRelease(pixelBuffer);
+            if (encodeStatus != noErr && requestedKeyframe) {
+                g.forceKeyframe.store(true, std::memory_order_release);
+            }
 
             static std::atomic<unsigned> capturedFrames{0};
             const unsigned n = ++capturedFrames;
@@ -494,6 +518,7 @@ extern "C" void SecondScreenStartTestStream(void) {
     }
 
     g.frameId.store(0);
+    g.forceKeyframe.store(true, std::memory_order_release);
     g.discoveryThread = std::thread(discoveryLoop);
     g.serverThread = std::thread(serverLoop);
     SecondScreenStartUsbAccessory();
@@ -513,6 +538,10 @@ extern "C" void SecondScreenStartTestStream(void) {
     }
 
     os_log(gLog, "SecondScreen test stream is running");
+}
+
+extern "C" int SecondScreenIsTestStreamRunning(void) {
+    return g.running.load(std::memory_order_acquire) ? 1 : 0;
 }
 
 extern "C" void SecondScreenStopTestStream(void) {

@@ -12,7 +12,9 @@ class VideoStreamDecoder(private val surface: SurfaceHolder) {
 
     fun decode(codec: Int, w: Int, h: Int, accessUnit: ByteArray, timestampUs: Long, keyFrame: Boolean) {
         if (decoder == null || codecId != codec || width != w || height != h) {
-            runCatching { configure(codec, w, h) }.getOrElse { return }
+            // Do not silently swallow codec configuration failures: the client
+            // must surface them and request a clean keyframe/recovery path.
+            configure(codec, w, h)
         }
         val d = decoder ?: return
         val index = d.dequeueInputBuffer(10_000)
@@ -28,8 +30,14 @@ class VideoStreamDecoder(private val surface: SurfaceHolder) {
                 val replacement = decoder ?: return
                 val replacementIndex = replacement.dequeueInputBuffer(10_000)
                 if (replacementIndex < 0) return
-                val replacementBuffer = replacement.getInputBuffer(replacementIndex) ?: return
-                if (accessUnit.size > replacementBuffer.capacity()) return
+                val replacementBuffer = replacement.getInputBuffer(replacementIndex) ?: run {
+                    runCatching { replacement.queueInputBuffer(replacementIndex, 0, 0, 0L, 0) }
+                    return
+                }
+                if (accessUnit.size > replacementBuffer.capacity()) {
+                    runCatching { replacement.queueInputBuffer(replacementIndex, 0, 0, 0L, 0) }
+                    error("H.264 access unit exceeds decoder input buffer capacity")
+                }
                 replacementBuffer.clear()
                 replacementBuffer.put(accessUnit)
                 replacement.queueInputBuffer(
